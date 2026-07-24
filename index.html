@@ -9,25 +9,20 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Rogue of Legends">
-    <link rel="apple-touch-icon" href="./icon.png">
 
     <!-- Tailwind CSS & Font Awesome -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script>
+        // PWA Manifest and Service Worker Registration
         const manifestData = {
             "name": "Rogue of Legends",
             "short_name": "RoL",
             "start_url": "./",
             "display": "standalone",
             "background_color": "#0f172a",
-            "theme_color": "#0f172a",
-            "icons": [{
-                "src": "./icon.png",
-                "sizes": "512x512",
-                "type": "image/png"
-            }]
+            "theme_color": "#0f172a"
         };
         const manifestBlob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
         const manifestUrl = URL.createObjectURL(manifestBlob);
@@ -230,15 +225,9 @@
         }
 
         @keyframes activeTurnGlow {
-            0% {
-                box-shadow: 0 0 6px 2px #3b82f6, 0 0 12px 4px rgba(59, 130, 246, 0.7);
-            }
-            50% {
-                box-shadow: 0 0 12px 4px #60a5fa, 0 0 22px 8px rgba(96, 165, 250, 0.9);
-            }
-            100% {
-                box-shadow: 0 0 6px 2px #3b82f6, 0 0 12px 4px rgba(59, 130, 246, 0.7);
-            }
+            0% { box-shadow: 0 0 6px 2px #3b82f6, 0 0 12px 4px rgba(59, 130, 246, 0.7); }
+            50% { box-shadow: 0 0 12px 4px #60a5fa, 0 0 22px 8px rgba(96, 165, 250, 0.9); }
+            100% { box-shadow: 0 0 6px 2px #3b82f6, 0 0 12px 4px rgba(59, 130, 246, 0.7); }
         }
 
         .active-turn-avatar {
@@ -544,6 +533,7 @@
                 minHit: 3,
                 hitDesc: "d3-6 (66.7% 命中)",
                 attackDesc: "周圍8格所有單位/障礙物 1 點傷害",
+                skillConfig: { canTargetObstacle: false, isDirectDamage: false, damage: 0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
@@ -564,6 +554,7 @@
                 minHit: 5,
                 hitDesc: "d5-6 (33.3% 命中)",
                 attackDesc: "上下左右 1 格目標 1 點傷害",
+                skillConfig: { canTargetObstacle: false, isDirectDamage: false, damage: 0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
@@ -584,6 +575,7 @@
                 minHit: 3,
                 hitDesc: "d3-4 (50% 命中)",
                 attackDesc: "普攻: 距離≤4目標1傷害 / 技能: 全圖1目標1傷害",
+                skillConfig: { canTargetObstacle: true, isDirectDamage: true, damage: 1.0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
@@ -602,6 +594,7 @@
                 minHit: 2,
                 hitDesc: "d2-4 (75% 命中)",
                 attackDesc: "選一個方向(同一直/橫/斜線)，對該線上1個單位造成1點傷害",
+                skillConfig: { canTargetObstacle: false, isDirectDamage: false, damage: 0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
@@ -620,6 +613,7 @@
                 minHit: 2,
                 hitDesc: "d2-4 (75% 命中)",
                 attackDesc: "普攻: 上下左右1格 / 技能: 命中後移動至≤2空格，回復0.5HP並對上下左右所有目標造成1傷害",
+                skillConfig: { canTargetObstacle: false, isDirectDamage: false, damage: 1.0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
@@ -638,6 +632,7 @@
                 minHit: 3,
                 hitDesc: "d3-6 (66.7% 命中)",
                 attackDesc: "技能: 命中檢定通過後發動斬擊，造成1傷害並回復0.7HP",
+                skillConfig: { canTargetObstacle: true, isDirectDamage: true, damage: 1.0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
@@ -657,7 +652,8 @@
                 maxHp: 4,
                 minHit: 2,
                 hitDesc: "d2-4 (75% 命中)",
-                attackDesc: "普攻: 距離≤2單體0.7傷害 / 技能: 命中檢定通過後移動至≤3空格，回復0.5HP",
+                attackDesc: "普攻: 距離≤2單體0.5傷害 / 技能: 命中檢定通過後移動至≤2空格，回復0.3HP",
+                skillConfig: { canTargetObstacle: false, isDirectDamage: false, damage: 0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
@@ -676,6 +672,7 @@
                 minHit: 3,
                 hitDesc: "d3-6 (66.7% 命中)",
                 attackDesc: "普攻: 距離≤2單體0.7傷害 / 技能: 與距離≤2障礙物對調，回復1HP對新位置四向角色造成0.7傷害",
+                skillConfig: { canTargetObstacle: true, isDirectDamage: false, damage: 0.7 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
@@ -695,7 +692,8 @@
                 maxHp: 6,
                 minHit: 4,
                 hitDesc: "d4-6 (50% 命中)",
-                attackDesc: "普攻: 周圍8格1單位1傷害 / 技能: 周圍8格1空格生成1HP障礙物",
+                attackDesc: "普攻: 周圍8格所有單位/障礙物 1 點傷害 / 技能: 周圍8格1空格生成1HP障礙物",
+                skillConfig: { canTargetObstacle: false, isDirectDamage: false, damage: 0 },
                 diceSides: [
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
                     { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
@@ -1229,9 +1227,11 @@
                         const obs = obstacles[`${nr},${nc}`];
 
                         if (enemy && enemy.alive) {
-                            if (enemy.id !== p.id) {
-                                targets.push({ r: nr, c: nc, target: enemy, isObstacle: false });
+                            if (enemy.id === p.id) {
+                                step++;
+                                continue;
                             }
+                            targets.push({ r: nr, c: nc, target: enemy, isObstacle: false });
                             break;
                         }
                         if (obs && obs.hp > 0) {
@@ -1296,7 +1296,7 @@
                     for (let r = 0; r < 9; r++) {
                         for (let c = 0; c < 9; c++) {
                             const dist = Math.abs(r - activeR) + Math.abs(c - activeC);
-                            if (dist >= 1 && dist <= 3 && !isOccupied(r, c)) {
+                            if (dist >= 1 && dist <= 2 && !isOccupied(r, c)) {
                                 targets.push({ r, c, isEmptySpace: true });
                             }
                         }
@@ -1493,7 +1493,7 @@
 
                 let damageAmount = 1;
                 if (attacker.classKey === 'scout' && actionType === 'ATTACK') {
-                    damageAmount = 0.7;
+                    damageAmount = 0.5;
                 } else if (attacker.classKey === 'ninja' && actionType === 'ATTACK') {
                     damageAmount = 0.7;
                 }
@@ -1501,9 +1501,9 @@
                 if (isHit) {
                     Sound.playHit();
                     logCombat(`🎯 命中！擲出 ${rollResult} (需要: ${cData.hitDesc})`);
-                    if (attacker.classKey === 'warrior') {
-                        let warriorTargets = getValidTargetsForClass(attacker, actionType);
-                        warriorTargets.forEach(t => applyDamage(t.target, damageAmount, t.r, t.c, t.isObstacle, attacker));
+                    if (attacker.classKey === 'warrior' || (attacker.classKey === 'alchemist' && actionType === 'ATTACK')) {
+                        let areaTargets = getValidTargetsForClass(attacker, actionType);
+                        areaTargets.forEach(t => applyDamage(t.target, damageAmount, t.r, t.c, t.isObstacle, attacker));
                     } else {
                         applyDamage(targetObj.target, damageAmount, targetObj.r, targetObj.c, targetObj.isObstacle, attacker);
                     }
@@ -1556,8 +1556,7 @@
                             showFloatingText(attacker.r, attacker.c, "+0.5", "floating-heal");
                             logCombat(`💖 刺客回復 0.5 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
                         }
-                        
-                        // 刺客技能 AOE 範圍傷害：對新位置上下左右相鄰的所有敵人與障礙物同時造成 1 點傷害
+
                         const crossDirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
                         crossDirs.forEach(d => {
                             const nr = attacker.r + d.r, nc = attacker.c + d.c;
@@ -1573,7 +1572,7 @@
                         });
                     } else if (attacker.classKey === 'berserker') {
                         await playAttackTrajectoryAnimation(attacker, targetObj.r, targetObj.c);
-                        
+
                         if (attacker.hp < attacker.maxHp) {
                             attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 0.7) * 10) / 10);
                             Sound.playHeal();
@@ -1589,10 +1588,10 @@
                         logCombat(`🏹 斥侯靈活位移至 (${targetObj.r + 1}, ${targetObj.c + 1})！`);
 
                         if (attacker.hp < attacker.maxHp) {
-                            attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 0.5) * 10) / 10);
+                            attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 0.3) * 10) / 10);
                             Sound.playHeal();
-                            showFloatingText(attacker.r, attacker.c, "+0.5", "floating-heal");
-                            logCombat(`💖 斥侯回復 0.5 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
+                            showFloatingText(attacker.r, attacker.c, "+0.3", "floating-heal");
+                            logCombat(`💖 斥侯回復 0.3 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
                         }
                     } else if (attacker.classKey === 'mage') {
                         await playAttackTrajectoryAnimation(attacker, targetObj.r, targetObj.c);
@@ -1802,7 +1801,6 @@
             processNextTurn();
         }
 
-        /* STREAMING_CHUNK:Implementing A* pathfinding and AI tactical evaluation... */
         function canUnitHitTargetFrom(unit, r, c, targetR, targetC) {
             if (!unit) return (Math.abs(r - targetR) + Math.abs(c - targetC) <= 1);
             const attackTargets = getValidTargetsForClass(unit, 'ATTACK', { r, c });
@@ -1941,6 +1939,22 @@
                 return targets.some(t => t.target && !t.isObstacle && t.target.isHuman);
             }
 
+            function getDamageForAction(actionType) {
+                if (actionType === 'ATTACK') {
+                    if (aiPlayer.classKey === 'scout') return 0.5;
+                    if (aiPlayer.classKey === 'ninja') return 0.7;
+                    return 1.0;
+                }
+                if (actionType === 'SKILL') {
+                    if (cData.skillConfig && cData.skillConfig.damage > 0) {
+                        return cData.skillConfig.damage;
+                    }
+                    if (aiPlayer.classKey === 'ninja') return 0.7;
+                    return 1.0;
+                }
+                return 1.0;
+            }
+
             function isAtOptimalPosition(r, c) {
                 const human = players.find(p => p.isHuman && p.alive);
                 if (!human) return true;
@@ -1975,6 +1989,7 @@
                 const humanPlayer = players.find(p => p.isHuman && p.alive);
                 if (!humanPlayer) break;
 
+                // 優先級 1：生存回血 (Heal Priority)
                 if (aiPlayer.hp < aiPlayer.maxHp) {
                     const healDice = unusedDice.find(d => d.type === 'HEAL');
                     if (healDice) {
@@ -1990,6 +2005,72 @@
                 const skillDice = unusedDice.find(d => d.type === 'SKILL');
                 const attackDice = unusedDice.find(d => d.type === 'ATTACK');
 
+                // 優先級 2：終結斬殺玩家 (Player Execution)
+                if (skillDice) {
+                    const dmg = getDamageForAction('SKILL');
+                    if (humanPlayer.hp <= dmg && canHitHumanFrom(aiPlayer.r, aiPlayer.c, 'SKILL')) {
+                        const targets = getValidTargetsForClass(aiPlayer, 'SKILL');
+                        const humanTarget = targets.find(t => !t.isObstacle && t.target && t.target.isHuman);
+                        if (humanTarget) {
+                            selectedDiceIdx = rolledDicePool.findIndex(d => d === skillDice);
+                            await new Promise(r => setTimeout(r, 450));
+                            if (currentGameSessionId !== sessionAtStart) return;
+                            await executeSkillAction(aiPlayer, humanTarget);
+                            if (checkGameOver()) return;
+                            continue;
+                        }
+                    }
+                }
+
+                if (attackDice) {
+                    const dmg = getDamageForAction('ATTACK');
+                    if (humanPlayer.hp <= dmg && canHitHumanFrom(aiPlayer.r, aiPlayer.c, 'ATTACK')) {
+                        const targets = getValidTargetsForClass(aiPlayer, 'ATTACK');
+                        const humanTarget = targets.find(t => !t.isObstacle && t.target && t.target.isHuman);
+                        if (humanTarget) {
+                            selectedDiceIdx = rolledDicePool.findIndex(d => d === attackDice);
+                            await new Promise(r => setTimeout(r, 450));
+                            if (currentGameSessionId !== sessionAtStart) return;
+                            await executeAttackAction(aiPlayer, humanTarget, 'ATTACK');
+                            if (checkGameOver()) return;
+                            continue;
+                        }
+                    }
+                }
+
+                // 優先級 3：尾刀殘血障礙物吸血 (Obstacle Last-Hit / Deny - 通用 Data-Driven 判斷)
+                if (aiPlayer.hp < aiPlayer.maxHp) {
+                    if (attackDice) {
+                        const dmg = getDamageForAction('ATTACK');
+                        const validTargets = getValidTargetsForClass(aiPlayer, 'ATTACK');
+                        const lastHittableObs = validTargets.find(t => t.isObstacle && t.target && t.target.hp <= dmg);
+                        if (lastHittableObs) {
+                            selectedDiceIdx = rolledDicePool.findIndex(d => d === attackDice);
+                            await new Promise(r => setTimeout(r, 450));
+                            if (currentGameSessionId !== sessionAtStart) return;
+                            await executeAttackAction(aiPlayer, lastHittableObs, 'ATTACK');
+                            if (checkGameOver()) return;
+                            continue;
+                        }
+                    }
+
+                    // ✅ 通用邏輯：只要該職業技能宣告可直接傷害障礙物，AI 就會嘗試使用技能尾刀
+                    if (skillDice && cData.skillConfig && cData.skillConfig.canTargetObstacle && cData.skillConfig.isDirectDamage) {
+                        const dmg = cData.skillConfig.damage || getDamageForAction('SKILL');
+                        const validTargets = getValidTargetsForClass(aiPlayer, 'SKILL');
+                        const lastHittableObs = validTargets.find(t => t.isObstacle && t.target && t.target.hp <= dmg);
+                        if (lastHittableObs) {
+                            selectedDiceIdx = rolledDicePool.findIndex(d => d === skillDice);
+                            await new Promise(r => setTimeout(r, 450));
+                            if (currentGameSessionId !== sessionAtStart) return;
+                            await executeSkillAction(aiPlayer, lastHittableObs);
+                            if (checkGameOver()) return;
+                            continue;
+                        }
+                    }
+                }
+
+                // 優先級 4：職業專屬戰術技能 (Class-Specific Skill)
                 if (aiPlayer.classKey === 'ninja' && skillDice) {
                     const skillObs = getValidTargetsForClass(aiPlayer, 'SKILL');
                     if (skillObs.length > 0) {
