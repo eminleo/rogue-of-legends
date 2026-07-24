@@ -1,7 +1,7 @@
 {
 "name": "Rogue of Legends",
 "short_name": "RoL",
-"description": "Rogue of Legends",
+"description": "Rogue of Legends - Turn-based Roguelike Board Game",
 "start_url": "./index.html",
 "scope": "./",
 "display": "standalone",
