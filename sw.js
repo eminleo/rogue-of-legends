@@ -1,24 +1,29 @@
-const CACHE_NAME = 'rogue-of-legends-v1.0.0';
+const CACHE_NAME = 'rogue-of-legends-v1.0.1';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.png', // 這裡改成 icon.png
+  './icon.png',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;700;900&display=swap'
 ];
 
-// ... (後續安裝與啟用邏輯保持不變)
-
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Pre-caching all game assets for offline play...');
-      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('[Service Worker] Non-critical resource cache failure:', err);
-      });
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('[Service Worker] Caching app assets...');
+      // 使用 Promise.allSettled 防止單一 CDN 資源載入失敗導致整體 SW 安裝失敗
+      await Promise.allSettled(
+        PRECACHE_ASSETS.map(url => 
+          fetch(url, { mode: 'cors' })
+            .then(response => {
+              if (response.ok) return cache.put(url, response);
+            })
+            .catch(err => console.warn('[SW] Precache failed for:', url, err))
+        )
+      );
     }).then(() => self.skipWaiting())
   );
 });
@@ -44,22 +49,17 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
+        // 背景異步更新快取 (Stale-While-Revalidate)
+        fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+          }
+        }).catch(() => {});
         return cachedResponse;
       }
 
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
-        }
-
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return networkResponse;
-      }).catch(() => {
-        if (event.request.headers.get('accept').includes('text/html')) {
+      return fetch(event.request).catch(() => {
+        if (event.request.headers.get('accept')?.includes('text/html')) {
           return caches.match('./index.html');
         }
       });
