@@ -10,35 +10,22 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Rogue of Legends">
 
+    <!-- PWA Manifest and Touch Icon -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+
     <!-- Tailwind CSS & Font Awesome -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script>
-        // PWA Manifest and Service Worker Registration
-        const manifestData = {
-            "name": "Rogue of Legends",
-            "short_name": "RoL",
-            "start_url": "./",
-            "display": "standalone",
-            "background_color": "#0f172a",
-            "theme_color": "#0f172a"
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
-        const manifestUrl = URL.createObjectURL(manifestBlob);
-        const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = manifestUrl;
-        document.head.appendChild(link);
-
+        // 標準 Service Worker 註冊流程 (避免使用 Blob URL)
         if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('install', e => self.skipWaiting());
-                self.addEventListener('activate', e => self.clients.claim());
-                self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
-            `;
-            const swBlob = new Blob([swCode], { type: 'text/javascript' });
-            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('[PWA] SW registered successfully:', reg.scope))
+                    .catch(err => console.warn('[PWA] SW registration failed:', err));
+            });
         }
     </script>
 
@@ -745,6 +732,79 @@
         let selectedDiceIdx = null;
         let isExecutingAction = false;
         let currentGameSessionId = 0;
+        let gameActive = false;
+
+        // --- localStorage 斷線存檔/復原邏輯 ---
+        function saveGameState() {
+            if (!gameActive) return;
+            const state = {
+                gameActive,
+                sudokuGrid,
+                obstacles,
+                players,
+                roundNumber,
+                turnOrder,
+                currentTurnIdx,
+                rolledDicePool,
+                selectedDiceIdx,
+                currentGameSessionId
+            };
+            try {
+                localStorage.setItem('rol_game_state', JSON.stringify(state));
+            } catch (e) {
+                console.warn('Unable to save game state to localStorage:', e);
+            }
+        }
+
+        function clearGameState() {
+            gameActive = false;
+            try {
+                localStorage.removeItem('rol_game_state');
+            } catch (e) {}
+        }
+
+        function loadGameState() {
+            try {
+                const saved = localStorage.getItem('rol_game_state');
+                if (!saved) return false;
+                const state = JSON.parse(saved);
+                if (!state || !state.gameActive) return false;
+
+                sudokuGrid = state.sudokuGrid;
+                obstacles = state.obstacles;
+                players = state.players;
+                roundNumber = state.roundNumber;
+                turnOrder = state.turnOrder;
+                currentTurnIdx = state.currentTurnIdx;
+                rolledDicePool = state.rolledDicePool;
+                selectedDiceIdx = state.selectedDiceIdx;
+                currentGameSessionId = state.currentGameSessionId || 1;
+                gameActive = true;
+
+                document.getElementById('class-select-modal').classList.add('hidden');
+                document.getElementById('game-over-modal').classList.add('opacity-0', 'pointer-events-none');
+                
+                renderSudokuBoard();
+                logCombat("🔄 已成功回復上一局對局進度！");
+
+                const activePlayer = players[turnOrder[currentTurnIdx]];
+                if (activePlayer) {
+                    document.getElementById('game-phase-text').innerText = `${activePlayer.name} 回合`;
+                    if (activePlayer.isHuman) {
+                        document.getElementById('btn-end-turn').disabled = false;
+                        renderDicePoolUI();
+                    } else {
+                        document.getElementById('btn-end-turn').disabled = true;
+                        runAITurn(activePlayer);
+                    }
+                }
+                return true;
+            } catch (e) {
+                console.error('Failed to restore game state:', e);
+                clearGameState();
+                return false;
+            }
+        }
 
         function generateSudoku() {
             const grid = Array.from({ length: 9 }, () => Array(9).fill(0));
@@ -757,6 +817,7 @@
         }
 
         function initGame() {
+            clearGameState();
             currentGameSessionId++;
             sudokuGrid = generateSudoku();
             obstacles = {};
@@ -769,7 +830,7 @@
             if (logContent) logContent.innerHTML = '';
 
             renderSudokuBoard();
-            logCombat("▶ 遊戲重置，請選擇您的職業！");
+            logCombat("▶ 遊戲初始化，請選擇您的職業！");
         }
 
         function renderSudokuBoard() {
@@ -830,9 +891,11 @@
             }
 
             roundNumber = 1;
+            gameActive = true;
             logCombat(`玩家選擇職業【${CLASSES[selectedClassKey].name}】！`);
             logCombat(`地圖生成了數獨 [${obstacleNumbers.join(', ')}] 的障礙物！`);
             updateBoardElements();
+            saveGameState();
             startNewRound();
         }
 
@@ -907,6 +970,7 @@
             logCombat(`--- 第 ${roundNumber} 輪！順序: [ ${orderNames} ] ---`);
 
             renderTurnOrderUI();
+            saveGameState();
             processNextTurn();
         }
 
@@ -952,6 +1016,7 @@
             logCombat(`>>> 輪到 ${activePlayer.name} (HP: ${formatHp(activePlayer.hp)})`);
 
             updateBoardElements();
+            saveGameState();
 
             await phase1RollDice(activePlayer);
         }
@@ -1002,6 +1067,7 @@
 
             if (currentGameSessionId !== sessionAtStart) return;
             renderDicePoolUI();
+            saveGameState();
 
             if (player.isHuman) {
                 document.getElementById('btn-end-turn').disabled = false;
@@ -1439,6 +1505,7 @@
                 logCombat(`👟 ${player.name} 移動至 (${targetR + 1}, ${targetC + 1})`);
                 consumeSelectedDice();
                 clearBoardHighlights();
+                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1460,6 +1527,7 @@
                 updateBoardElements();
                 consumeSelectedDice();
                 clearBoardHighlights();
+                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1476,6 +1544,7 @@
                 if (!isValid) {
                     logCombat(`⚠️ ${attacker.name} 目標不在有效射程內，行動取消`);
                     consumeSelectedDice();
+                    saveGameState();
                     return;
                 }
 
@@ -1515,6 +1584,7 @@
 
                 consumeSelectedDice();
                 updateBoardElements();
+                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1641,6 +1711,7 @@
 
                 consumeSelectedDice();
                 updateBoardElements();
+                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1783,6 +1854,7 @@
                 selectedDiceIdx = null;
             }
             renderDicePoolUI();
+            saveGameState();
         }
 
         function manualEndTurn() {
@@ -1798,6 +1870,7 @@
             selectedDiceIdx = null;
             logCombat(`⏭️ 手動結束回合`);
             currentTurnIdx++;
+            saveGameState();
             processNextTurn();
         }
 
@@ -2038,7 +2111,7 @@
                     }
                 }
 
-                // 優先級 3：尾刀殘血障礙物吸血 (Obstacle Last-Hit / Deny - 通用 Data-Driven 判斷)
+                // 優先級 3：尾刀殘血障礙物吸血 (Obstacle Last-Hit / Deny)
                 if (aiPlayer.hp < aiPlayer.maxHp) {
                     if (attackDice) {
                         const dmg = getDamageForAction('ATTACK');
@@ -2054,7 +2127,6 @@
                         }
                     }
 
-                    // ✅ 通用邏輯：只要該職業技能宣告可直接傷害障礙物，AI 就會嘗試使用技能尾刀
                     if (skillDice && cData.skillConfig && cData.skillConfig.canTargetObstacle && cData.skillConfig.isDirectDamage) {
                         const dmg = cData.skillConfig.damage || getDamageForAction('SKILL');
                         const validTargets = getValidTargetsForClass(aiPlayer, 'SKILL');
@@ -2198,6 +2270,7 @@
             await new Promise(r => setTimeout(r, 300));
             if (currentGameSessionId !== sessionAtStart) return;
             currentTurnIdx++;
+            saveGameState();
             processNextTurn();
         }
 
@@ -2258,6 +2331,7 @@
         }
 
         function showGameOverModal(isVictory) {
+            clearGameState();
             const modal = document.getElementById('game-over-modal');
             const icon = document.getElementById('game-over-icon');
             const title = document.getElementById('game-over-title');
@@ -2278,7 +2352,11 @@
         }
 
         window.onload = function() {
-            initGame();
+            // 優先嘗試載入 localStorage 中的上次進度
+            const restored = loadGameState();
+            if (!restored) {
+                initGame();
+            }
         };
     </script>
 </body>
