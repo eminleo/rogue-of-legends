@@ -1128,13 +1128,13 @@
                             </svg>
                             <div class="relative z-10 flex items-center justify-center pt-1.5 h-full w-full text-[10px] font-black">${roll}</div>
                         </div>
-                        <span class="text-[10px] font-bold ${isHit ? 'text-emerald-700' : 'text-red-700'}">${isHit ? '命中!' : '閃避!'}</span>
+                        <span class="text-[10px] font-bold ${isHit ? 'text-emerald-700' : 'text-red-700'}">${isHit ? '成功!' : '失敗!'}</span>
                     `;
                 } else {
                     statusBox.innerHTML = `
                         <span class="text-[10px] text-indigo-900 font-bold">${attacker.name}:</span>
                         <div class="w-5 h-5 ${isHit ? 'bg-emerald-600' : 'bg-red-600'} border-2 border-slate-900 rounded flex items-center justify-center text-[11px] font-black text-white">${roll}</div>
-                        <span class="text-[10px] font-bold ${isHit ? 'text-emerald-700' : 'text-red-700'}">${isHit ? '命中!' : '閃避!'}</span>
+                        <span class="text-[10px] font-bold ${isHit ? 'text-emerald-700' : 'text-red-700'}">${isHit ? '成功!' : '失敗!'}</span>
                     `;
                 }
                 await new Promise(r => setTimeout(r, 600));
