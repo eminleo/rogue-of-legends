@@ -1,0 +1,19 @@
+{
+"name": "Rogue of Legends",
+"short_name": "RoL",
+"description": "Rogue of Legends",
+"start_url": "./index.html",
+"scope": "./",
+"display": "standalone",
+"orientation": "portrait",
+"background_color": "#0f172a",
+"theme_color": "#0f172a",
+"icons": [
+{
+"src": "icon.png",
+"sizes": "192x192 512x512",
+"type": "image/png",
+"purpose": "any maskable"
+}
+]
+}

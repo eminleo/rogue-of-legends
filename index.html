@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rogue of Legends</title>
+
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Rogue of Legends">
+    <link rel="apple-touch-icon" href="./icon.png">
+
+    <!-- Tailwind CSS & Font Awesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        const manifestData = {
+            "name": "Rogue of Legends",
+            "short_name": "RoL",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#0f172a",
+            "theme_color": "#0f172a",
+            "icons": [{
+                "src": "./icon.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            }]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestUrl;
+        document.head.appendChild(link);
+
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', e => self.skipWaiting());
+                self.addEventListener('activate', e => self.clients.claim());
+                self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
+            `;
+            const swBlob = new Blob([swCode], { type: 'text/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+
+        * {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+            background-color: #f6f3eb;
+            background-image: 
+                linear-gradient(#e2dfd5 1px, transparent 1px),
+                linear-gradient(90deg, #e2dfd5 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: #1e293b;
+            user-select: none;
+            overflow-x: hidden;
+            overscroll-behavior-y: none;
+        }
+
+        /* Lined Paper Style for Combat Log */
+        .lined-paper-2 {
+            background-color: #fefdf8;
+            background-image: 
+                linear-gradient(90deg, transparent 32px, #f87171 32px, #f87171 33px, transparent 33px),
+                repeating-linear-gradient(transparent, transparent 21px, #cbd5e1 21px, #cbd5e1 22px);
+            background-size: 100% 100%, 100% 22px;
+            background-attachment: local;
+            line-height: 22px;
+            padding-left: 38px !important;
+            padding-right: 10px !important;
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05), 0 4px 10px rgba(0,0,0,0.12);
+        }
+
+        .sudoku-grid {
+            display: grid;
+            grid-template-columns: repeat(9, minmax(0, 1fr));
+            grid-template-rows: repeat(9, minmax(0, 1fr));
+            gap: 1px;
+            background-color: #334155;
+            padding: 3px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 0 0 2px #334155;
+            position: relative;
+            touch-action: none;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            flex-shrink: 0;
+            overflow: visible;
+        }
+
+        .grid-cell {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            background-color: #fcfbf7;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            box-sizing: border-box;
+        }
+
+        .obstacle-block {
+            position: absolute;
+            inset: 2px;
+            background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+            border: 2px solid #334155;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.2);
+            pointer-events: none;
+        }
+
+        @keyframes floatAndFade {
+            0% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+            50% { transform: translate(-50%, -50%) translateY(-20px); }
+            100% { opacity: 0; transform: translate(-50%, -50%) translateY(-40px); }
+        }
+
+        .floating-text {
+            position: absolute;
+            left: 50%;
+            top: 30%;
+            transform: translate(-50%, -50%);
+            font-weight: 900;
+            font-size: 1.3rem;
+            pointer-events: none;
+            z-index: 70;
+            animation: floatAndFade 1.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+            text-shadow: 0px 2px 4px rgba(255,255,255,0.9), 0px 1px 2px rgba(0,0,0,0.8);
+            white-space: nowrap;
+        }
+
+        .floating-damage { color: #dc2626; }
+        .floating-heal { color: #059669; }
+        .floating-miss { color: #334155; }
+
+        .dice-d6 {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            border: 2.5px solid #0f172a;
+            flex-shrink: 0;
+        }
+
+        @keyframes diceRoll {
+            0% { transform: rotate(0deg); opacity: 0.3; }
+            50% { transform: rotate(180deg); }
+            100% { transform: rotate(360deg); opacity: 1; }
+        }
+        .rolling-dice { animation: diceRoll 0.4s ease-out; }
+
+        .valid-move {
+            background-color: rgba(245, 158, 11, 0.45) !important;
+            border: 2px dashed #d97706 !important;
+            cursor: pointer;
+        }
+        .valid-heal {
+            background-color: rgba(16, 185, 129, 0.45) !important;
+            border: 2px dashed #059669 !important;
+            cursor: pointer;
+        }
+        .valid-target {
+            background-color: rgba(239, 68, 68, 0.45) !important;
+            border: 2px dashed #dc2626 !important;
+            cursor: pointer;
+            animation: pulseTarget 1s infinite alternate;
+        }
+        .valid-skill {
+            background-color: rgba(59, 130, 246, 0.45) !important;
+            border: 2px dashed #2563eb !important;
+            cursor: pointer;
+            animation: pulseSkill 1s infinite alternate;
+        }
+        @keyframes pulseTarget {
+            0% { box-shadow: inset 0 0 4px #ef4444; }
+            100% { box-shadow: inset 0 0 12px #ef4444; }
+        }
+        @keyframes pulseSkill {
+            0% { box-shadow: inset 0 0 4px #3b82f6; }
+            100% { box-shadow: inset 0 0 12px #3b82f6; }
+        }
+
+        .impact-burst {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 45;
+            background: radial-gradient(circle, rgba(239,68,68,0.85) 0%, rgba(245,158,11,0.5) 50%, transparent 75%);
+            border-radius: 50%;
+            animation: impactFlash 0.4s ease-out forwards;
+        }
+
+        @keyframes impactFlash {
+            0% { opacity: 0; transform: scale(0.2); }
+            50% { opacity: 1; transform: scale(1.3); }
+            100% { opacity: 0; transform: scale(1.6); }
+        }
+
+        .character-avatar {
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        @keyframes activeTurnGlow {
+            0% {
+                box-shadow: 0 0 6px 2px #3b82f6, 0 0 12px 4px rgba(59, 130, 246, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 12px 4px #60a5fa, 0 0 22px 8px rgba(96, 165, 250, 0.9);
+            }
+            100% {
+                box-shadow: 0 0 6px 2px #3b82f6, 0 0 12px 4px rgba(59, 130, 246, 0.7);
+            }
+        }
+
+        .active-turn-avatar {
+            border-color: #60a5fa !important;
+            animation: activeTurnGlow 1.4s infinite ease-in-out;
+            z-index: 25 !important;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="h-[100dvh] max-h-[100dvh] flex flex-col justify-center items-center p-2.5 max-w-sm mx-auto overflow-hidden text-slate-800">
+
+    <div class="w-full flex flex-col justify-center items-center space-y-1.5 h-full my-auto max-h-[100dvh]">
+
+        <!-- 1. 9x9 戰棋棋盤區域 -->
+        <main class="w-full flex justify-center items-center shrink-0">
+            <div id="sudoku-board" class="sudoku-grid">
+                <!-- 9x9 格子 -->
+            </div>
+        </main>
+
+        <!-- 2. 戰況日誌 (Lined Paper Texture) -->
+        <div class="relative w-full shrink-0 z-20 h-[88px]">
+            <div id="combat-log" onclick="toggleCombatLog()" class="w-full h-full lined-paper-2 text-[11px] text-slate-800 overflow-hidden font-mono cursor-pointer transition-all duration-200 select-none relative">
+                <div id="combat-log-content" class="space-y-0">
+                    <p class="text-slate-500 leading-[22px] h-[22px] truncate">[系統] 遊戲初始化中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 合併後的輪次順序與操作控制區 -->
+        <footer class="w-full shrink-0">
+            <div class="bg-[#fefcf6] p-2.5 rounded-xl border-2 border-slate-700 shadow-md relative overflow-hidden flex flex-col space-y-2">
+                <!-- 上層：輪次資訊與行動順序條 -->
+                <div class="flex items-center justify-between gap-1.5 border-b border-slate-300 pb-1.5">
+                    <div class="flex items-center space-x-1 shrink-0 pr-1 border-r border-slate-200">
+                        <button onclick="confirmResetGame()" class="p-1 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg border-2 border-slate-700 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-rotate-right text-[10px]"></i>
+                        </button>
+                        <div class="bg-white px-1.5 py-0.5 rounded-lg border-2 border-slate-700 text-center flex flex-col items-center justify-center min-w-[48px]">
+                            <div class="leading-tight text-slate-700 font-bold text-[9px]">第 <span id="round-number" class="text-indigo-600">1</span> 輪</div>
+                            <div id="game-phase-text" class="text-emerald-600 font-bold truncate max-w-[55px] leading-tight text-[8px]">準備中</div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center overflow-x-auto no-scrollbar flex-1 py-0.5 px-0.5">
+                        <div id="turn-order-container" class="flex items-center gap-1.5 py-0.5 px-0.5 justify-start min-w-max">
+                            <!-- 動態注入順序圖示 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中層：當前角色資訊、檢定顯示與結束回合按鈕 -->
+                <div class="flex items-center justify-between h-7 border-b border-slate-300 pb-1.5">
+                    <div id="active-player-info" class="flex items-center space-x-1.5 text-xs truncate max-w-[130px]">
+                        <span class="text-slate-500 text-[11px]">等待開始...</span>
+                    </div>
+
+                    <div id="inline-roll-status" class="invisible flex items-center gap-1 text-[11px] bg-white px-2 py-0.5 rounded-lg border-2 border-indigo-500/60 h-6">
+                        <!-- 動態注入檢定骰子 -->
+                    </div>
+
+                    <button id="btn-end-turn" onclick="manualEndTurn()" disabled class="px-2.5 py-1 bg-indigo-600 disabled:bg-slate-300 disabled:text-slate-500 text-white text-[11px] font-bold rounded-lg shadow border border-indigo-700 transition shrink-0">
+                        結束回合
+                    </button>
+                </div>
+
+                <!-- 下層：可用骰子池與計數標籤 -->
+                <div class="flex items-center justify-between h-9">
+                    <div id="dice-pool-container" class="flex flex-wrap gap-1.5 items-center h-full">
+                        <span class="text-xs text-slate-500">等待擲骰...</span>
+                    </div>
+                    <div id="dice-count-badge" class="text-[10px] bg-white px-1.5 py-0.5 rounded text-slate-700 border-2 border-slate-700 shrink-0 font-bold">
+                        0 可用
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- 開局選角 Modal -->
+    <div id="class-select-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-[#fefcf6] border-2 border-slate-800 rounded-2xl p-4 max-w-xs w-full shadow-2xl space-y-3">
+            <div class="text-center">
+                <h2 class="text-lg font-black text-slate-900">選擇您的職業</h2>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto pr-0.5">
+                <!-- 戰士 -->
+                <div onclick="selectPlayerClass('warrior')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                            <path d="M12 1L15 5.5L14.3 13H19C19.6 13 20 13.4 20 14C20 14.6 19.6 15 19 15H13.5V19.5L14.5 20.3C15 20.7 15 21.4 14.5 21.9C13.8 22.6 12.8 23 12 23C11.2 23 10.2 22.6 9.5 20.3L10.5 19.5V15H5C4.4 15 4 14.6 4 14C4 13.4 4.4 13 5 13H9.7L9 5.5L12 1Z"/>
+                        </svg>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">戰士</div>
+                </div>
+
+                <!-- 坦克 -->
+                <div onclick="selectPlayerClass('tank')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <i class="fa-solid fa-shield-halved text-sm"></i>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">坦克</div>
+                </div>
+
+                <!-- 法師 -->
+                <div onclick="selectPlayerClass('mage')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">法師</div>
+                </div>
+
+                <!-- 射手 -->
+                <div onclick="selectPlayerClass('archer')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <i class="fa-solid fa-bullseye text-sm"></i>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">射手</div>
+                </div>
+
+                <!-- 刺客 -->
+                <div onclick="selectPlayerClass('assassin')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                            <path d="M12 2C10.3 2 9 3.3 9 5C6.8 5.8 5 8.2 5 11V20C5 21.1 5.9 22 7 22H17C18.1 22 19 21.1 19 20V11C19 8.2 17.2 5.8 15 5C15 3.3 13.7 2 12 2ZM11 4.5C11 4.2 11.4 4 12 4C12.6 4 13 4.2 13 4.5V6H11V4.5ZM7 11C7 9 8.5 7.2 10.5 6.6V12L7.2 13.5C7.1 12.7 7 11.8 7 11ZM17 11C17 11.8 16.9 12.7 16.8 13.5L13.5 12V6.6C15.5 7.2 17 9 17 11ZM12 13.8L16.5 15.8V20H7.5V15.8L12 13.8Z"/>
+                        </svg>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">刺客</div>
+                </div>
+
+                <!-- 狂戰士 -->
+                <div onclick="selectPlayerClass('berserker')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <i class="fa-solid fa-fire text-sm"></i>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">狂戰士</div>
+                </div>
+
+                <!-- 斥侯 -->
+                <div onclick="selectPlayerClass('scout')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <i class="fa-solid fa-compass text-sm"></i>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">斥侯</div>
+                </div>
+
+                <!-- 忍者 -->
+                <div onclick="selectPlayerClass('ninja')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <i class="fa-solid fa-user-ninja text-sm"></i>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">忍者</div>
+                </div>
+
+                <!-- 鍊金術士 -->
+                <div onclick="selectPlayerClass('alchemist')" class="aspect-square p-2 bg-white hover:bg-slate-100 border-2 border-slate-800 rounded-xl cursor-pointer transition flex flex-col items-center justify-center space-y-1 shadow-sm">
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                        <i class="fa-solid fa-flask text-sm"></i>
+                    </div>
+                    <div class="text-[11px] font-bold text-slate-900">鍊金術士</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重開確認與遊戲結束 Modals -->
+    <div id="confirm-reset-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity">
+        <div class="bg-[#fefcf6] border-2 border-slate-800 rounded-2xl p-5 max-w-xs w-full text-center shadow-2xl space-y-4">
+            <h3 class="text-base font-bold text-slate-800">確定要重新開始遊戲嗎？</h3>
+            <p class="text-xs text-slate-500">當前對局進度將會遺失。</p>
+            <div class="flex gap-2">
+                <button onclick="closeResetConfirm()" class="flex-1 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 border-2 border-slate-700 text-xs font-bold rounded-xl transition">取消</button>
+                <button onclick="executeResetGame()" class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition shadow">確定重開</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity">
+        <div class="bg-[#fefcf6] border-2 border-slate-800 rounded-2xl p-6 max-w-xs w-full text-center shadow-2xl">
+            <div id="game-over-icon" class="text-4xl mb-2">🏆</div>
+            <h2 id="game-over-title" class="text-xl font-black mb-1">勝利！</h2>
+            <p id="game-over-desc" class="text-xs text-slate-500 mb-5">你成功摧毀了所有 AI 敵方！</p>
+            <button onclick="initGame()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow border border-indigo-800 transition">
+                再玩一局
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const Sound = {
+            ctx: null,
+            init() { 
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume().catch(() => {});
+                }
+            },
+            playRoll() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(120 + Math.random() * 200, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+            },
+            playHit() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(280, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+            },
+            playMiss() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(350, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+            },
+            playHeal() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.25);
+            },
+            playBreak() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+            }
+        };
+
+        const unlockAudioOnInteraction = () => {
+            Sound.init();
+            if (Sound.ctx && Sound.ctx.state === 'running') {
+                window.removeEventListener('pointerdown', unlockAudioOnInteraction);
+                window.removeEventListener('touchstart', unlockAudioOnInteraction);
+                window.removeEventListener('keydown', unlockAudioOnInteraction);
+            }
+        };
+        window.addEventListener('pointerdown', unlockAudioOnInteraction);
+        window.addEventListener('touchstart', unlockAudioOnInteraction);
+        window.addEventListener('keydown', unlockAudioOnInteraction);
+
+        function findClosestSpaceToTarget(spaces, targetR, targetC) {
+            if (!spaces || spaces.length === 0) return null;
+            let minDist = Infinity;
+            let closestSpaces = [];
+            spaces.forEach(space => {
+                const dist = Math.abs(space.r - targetR) + Math.abs(space.c - targetC);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestSpaces = [space];
+                } else if (dist === minDist) {
+                    closestSpaces.push(space);
+                }
+            });
+            return closestSpaces[Math.floor(Math.random() * closestSpaces.length)];
+        }
+
+        const CLASSES = {
+            warrior: {
+                name: "戰士",
+                icon: "fa-greatsword",
+                color: "bg-amber-500",
+                hexColor: "#f59e0b",
+                aiType: "aggressive",
+                diceType: "D6",
+                maxHp: 6,
+                minHit: 3,
+                hitDesc: "d3-6 (66.7% 命中)",
+                attackDesc: "周圍8格所有單位/障礙物 1 點傷害",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' }
+                ]
+            },
+            tank: {
+                name: "坦克",
+                icon: "fa-shield-halved",
+                color: "bg-emerald-600",
+                hexColor: "#059669",
+                aiType: "aggressive",
+                diceType: "D6",
+                maxHp: 6,
+                minHit: 5,
+                hitDesc: "d5-6 (33.3% 命中)",
+                attackDesc: "上下左右 1 格目標 1 點傷害",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' }
+                ]
+            },
+            mage: {
+                name: "法師",
+                icon: "fa-wand-magic-sparkles",
+                color: "bg-blue-600",
+                hexColor: "#2563eb",
+                aiType: "fleeing",
+                diceType: "D4",
+                maxHp: 4,
+                minHit: 3,
+                hitDesc: "d3-4 (50% 命中)",
+                attackDesc: "普攻: 距離≤4目標1傷害 / 技能: 全圖1目標1傷害",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' }
+                ]
+            },
+            archer: {
+                name: "射手",
+                icon: "fa-bullseye",
+                color: "bg-red-600",
+                hexColor: "#dc2626",
+                aiType: "fleeing",
+                diceType: "D4",
+                maxHp: 4,
+                minHit: 2,
+                hitDesc: "d2-4 (75% 命中)",
+                attackDesc: "選一個方向(同一直/橫/斜線)，對該線上1個單位造成1點傷害",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'HEAL', label: '回血', icon: 'fa-heart', color: 'bg-emerald-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' }
+                ]
+            },
+            assassin: {
+                name: "刺客",
+                icon: "fa-cloak",
+                color: "bg-blue-600",
+                hexColor: "#2563eb",
+                aiType: "aggressive",
+                diceType: "D4",
+                maxHp: 4,
+                minHit: 2,
+                hitDesc: "d2-4 (75% 命中)",
+                attackDesc: "普攻: 上下左右1格 / 技能: 命中後移動至≤2空格，回復0.5HP並對上下左右所有目標造成1傷害",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' }
+                ]
+            },
+            berserker: {
+                name: "狂戰士",
+                icon: "fa-fire",
+                color: "bg-blue-600",
+                hexColor: "#2563eb",
+                aiType: "aggressive",
+                diceType: "D6",
+                maxHp: 6,
+                minHit: 3,
+                hitDesc: "d3-6 (66.7% 命中)",
+                attackDesc: "技能: 命中檢定通過後發動斬擊，造成1傷害並回復0.7HP",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' }
+                ]
+            },
+            scout: {
+                name: "斥侯",
+                icon: "fa-compass",
+                color: "bg-blue-600",
+                hexColor: "#2563eb",
+                aiType: "fleeing",
+                diceType: "D4",
+                maxHp: 4,
+                minHit: 2,
+                hitDesc: "d2-4 (75% 命中)",
+                attackDesc: "普攻: 距離≤2單體0.7傷害 / 技能: 命中檢定通過後移動至≤3空格，回復0.5HP",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' }
+                ]
+            },
+            ninja: {
+                name: "忍者",
+                icon: "fa-user-ninja",
+                color: "bg-purple-600",
+                hexColor: "#9333ea",
+                aiType: "aggressive",
+                diceType: "D6",
+                maxHp: 6,
+                minHit: 3,
+                hitDesc: "d3-6 (66.7% 命中)",
+                attackDesc: "普攻: 距離≤2單體0.7傷害 / 技能: 與距離≤2障礙物對調，回復1HP對新位置四向角色造成0.7傷害",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' }
+                ]
+            },
+            alchemist: {
+                name: "鍊金術士",
+                icon: "fa-flask",
+                color: "bg-teal-600",
+                hexColor: "#0d9488",
+                aiType: "fleeing",
+                diceType: "D6",
+                maxHp: 6,
+                minHit: 4,
+                hitDesc: "d4-6 (50% 命中)",
+                attackDesc: "普攻: 周圍8格1單位1傷害 / 技能: 周圍8格1空格生成1HP障礙物",
+                diceSides: [
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'MOVE', label: '移動', icon: 'fa-shoe-prints', color: 'bg-amber-500' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'ATTACK', label: '攻擊', icon: 'fa-greatsword', color: 'bg-red-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' },
+                    { type: 'SKILL', label: '技能', icon: 'fa-bolt', color: 'bg-blue-600' }
+                ]
+            }
+        };
+
+        const COLOR_HEX_MAP = {
+            'bg-amber-500': '#f59e0b',
+            'bg-emerald-600': '#059669',
+            'bg-red-600': '#dc2626',
+            'bg-blue-600': '#2563eb',
+            'bg-purple-600': '#9333ea',
+            'bg-teal-600': '#0d9488'
+        };
+
+        function formatHp(hp) {
+            return Number.isInteger(hp) ? hp.toString() : hp.toFixed(1);
+        }
+
+        function renderIcon(iconName, extraClasses = "") {
+            if (iconName === 'fa-greatsword' || iconName === 'greatsword' || iconName === 'fa-sword') {
+                return `<svg class="inline-block w-[1.1em] h-[1.1em] fill-current align-middle ${extraClasses}" viewBox="0 0 24 24">
+                    <path d="M12 1L15 5.5L14.3 13H19C19.6 13 20 13.4 20 14C20 14.6 19.6 15 19 15H13.5V19.5L14.5 20.3C15 20.7 15 21.4 14.5 21.9C13.8 22.6 12.8 23 12 23C11.2 23 10.2 22.6 9.5 20.3L10.5 19.5V15H5C4.4 15 4 14.6 4 14C4 13.4 4.4 13 5 13H9.7L9 5.5L12 1Z"/>
+                    <path d="M12 4.5V12" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+                </svg>`;
+            }
+            if (iconName === 'fa-cloak' || iconName === 'cloak') {
+                return `<svg class="inline-block w-[1.1em] h-[1.1em] fill-current align-middle ${extraClasses}" viewBox="0 0 24 24">
+                    <path d="M12 2C10.3 2 9 3.3 9 5C6.8 5.8 5 8.2 5 11V20C5 21.1 5.9 22 7 22H17C18.1 22 19 21.1 19 20V11C19 8.2 17.2 5.8 15 5C15 3.3 13.7 2 12 2ZM11 4.5C11 4.2 11.4 4 12 4C12.6 4 13 4.2 13 4.5V6H11V4.5ZM7 11C7 9 8.5 7.2 10.5 6.6V12L7.2 13.5C7.1 12.7 7 11.8 7 11ZM17 11C17 11.8 16.9 12.7 16.8 13.5L13.5 12V6.6C15.5 7.2 17 9 17 11ZM12 13.8L16.5 15.8V20H7.5V15.8L12 13.8Z"/>
+                </svg>`;
+            }
+            return `<i class="fa-solid ${iconName} ${extraClasses}"></i>`;
+        }
+
+        const CORNERS = [{r:0,c:0}, {r:0,c:8}, {r:8,c:0}, {r:8,c:8}];
+
+        let sudokuGrid = [];
+        let obstacles = {};
+        let players = [];
+        let roundNumber = 1;
+        let turnOrder = [];
+        let currentTurnIdx = 0;
+        let rolledDicePool = [];
+        let selectedDiceIdx = null;
+        let isExecutingAction = false;
+        let currentGameSessionId = 0;
+
+        function generateSudoku() {
+            const grid = Array.from({ length: 9 }, () => Array(9).fill(0));
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    grid[r][c] = ((Math.floor(r / 3) + (r % 3) * 3 + c) % 9) + 1;
+                }
+            }
+            return grid;
+        }
+
+        function initGame() {
+            currentGameSessionId++;
+            sudokuGrid = generateSudoku();
+            obstacles = {};
+            isExecutingAction = false;
+            selectedDiceIdx = null;
+            document.getElementById('game-over-modal').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('class-select-modal').classList.remove('hidden');
+
+            const logContent = document.getElementById('combat-log-content');
+            if (logContent) logContent.innerHTML = '';
+
+            renderSudokuBoard();
+            logCombat("▶ 遊戲重置，請選擇您的職業！");
+        }
+
+        function renderSudokuBoard() {
+            const boardEl = document.getElementById('sudoku-board');
+            boardEl.innerHTML = '';
+
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${r}-${c}`;
+                    cell.className = 'grid-cell';
+                    cell.onclick = () => handleCellClick(r, c);
+
+                    boardEl.appendChild(cell);
+                }
+            }
+            updateBoardElements();
+        }
+
+        function selectPlayerClass(selectedClassKey) {
+            document.getElementById('class-select-modal').classList.add('hidden');
+
+            if (!sudokuGrid || sudokuGrid.length !== 9) {
+                sudokuGrid = generateSudoku();
+                renderSudokuBoard();
+            }
+
+            const allClassKeys = Object.keys(CLASSES);
+            const aiClassKeys = [
+                allClassKeys[Math.floor(Math.random() * allClassKeys.length)],
+                allClassKeys[Math.floor(Math.random() * allClassKeys.length)],
+                allClassKeys[Math.floor(Math.random() * allClassKeys.length)]
+            ];
+            const cornersShuffled = [...CORNERS].sort(() => Math.random() - 0.5);
+
+            players = [
+                { id: 0, name: "玩家", isHuman: true, classKey: selectedClassKey, hp: CLASSES[selectedClassKey].maxHp, maxHp: CLASSES[selectedClassKey].maxHp, r: cornersShuffled[0].r, c: cornersShuffled[0].c, alive: true },
+                { id: 1, name: "AI-1", isHuman: false, classKey: aiClassKeys[0], hp: CLASSES[aiClassKeys[0]].maxHp, maxHp: CLASSES[aiClassKeys[0]].maxHp, r: cornersShuffled[1].r, c: cornersShuffled[1].c, alive: true },
+                { id: 2, name: "AI-2", isHuman: false, classKey: aiClassKeys[1], hp: CLASSES[aiClassKeys[1]].maxHp, maxHp: CLASSES[aiClassKeys[1]].maxHp, r: cornersShuffled[2].r, c: cornersShuffled[2].c, alive: true },
+                { id: 3, name: "AI-3", isHuman: false, classKey: aiClassKeys[2], hp: CLASSES[aiClassKeys[2]].maxHp, maxHp: CLASSES[aiClassKeys[2]].maxHp, r: cornersShuffled[3].r, c: cornersShuffled[3].c, alive: true }
+            ];
+
+            const occupiedNumbers = new Set(cornersShuffled.map(pos => (sudokuGrid[pos.r] && sudokuGrid[pos.r][pos.c]) || 0));
+            const availableNumbers = [1,2,3,4,5,6,7,8,9].filter(n => !occupiedNumbers.has(n));
+            availableNumbers.sort(() => Math.random() - 0.5);
+
+            const pickCount = Math.floor(Math.random() * 2) + 1;
+            const obstacleNumbers = availableNumbers.slice(0, pickCount);
+
+            obstacles = {};
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const cellVal = sudokuGrid[r][c];
+                    if (obstacleNumbers.includes(cellVal)) {
+                        obstacles[`${r},${c}`] = { hp: cellVal, maxHp: cellVal };
+                    }
+                }
+            }
+
+            roundNumber = 1;
+            logCombat(`玩家選擇職業【${CLASSES[selectedClassKey].name}】！`);
+            logCombat(`地圖生成了數獨 [${obstacleNumbers.join(', ')}] 的障礙物！`);
+            updateBoardElements();
+            startNewRound();
+        }
+
+        function updateActivePlayerInfo() {
+            if (!turnOrder || turnOrder.length === 0 || currentTurnIdx >= turnOrder.length) return;
+            const activePlayer = players[turnOrder[currentTurnIdx]];
+            if (!activePlayer) return;
+            const cData = CLASSES[activePlayer.classKey];
+            const infoEl = document.getElementById('active-player-info');
+            if (infoEl) {
+                infoEl.innerHTML = `
+                    ${renderIcon(cData.icon, 'text-indigo-600')}
+                    <span class="font-bold text-slate-800">${activePlayer.name} (${cData.name})</span>
+                    <span class="text-emerald-600 font-bold ml-0.5">${formatHp(activePlayer.hp)}/${activePlayer.maxHp} HP</span>
+                `;
+            }
+        }
+
+        function updateBoardElements() {
+            document.querySelectorAll('.character-avatar, .obstacle-block').forEach(el => el.remove());
+
+            Object.keys(obstacles).forEach(key => {
+                const [r, c] = key.split(',').map(Number);
+                const obs = obstacles[key];
+                if (obs.hp <= 0) return;
+
+                const cell = document.getElementById(`cell-${r}-${c}`);
+                if (cell) {
+                    const obsEl = document.createElement('div');
+                    obsEl.className = 'obstacle-block';
+                    obsEl.innerHTML = `<i class="fa-solid fa-cube text-xs text-slate-300"></i>`;
+                    cell.appendChild(obsEl);
+                }
+            });
+
+            const activePlayerId = (turnOrder && turnOrder.length > 0 && currentTurnIdx < turnOrder.length) ? turnOrder[currentTurnIdx] : null;
+
+            players.forEach(p => {
+                if (!p.alive) return;
+                const cell = document.getElementById(`cell-${p.r}-${p.c}`);
+                if (!cell) return;
+
+                const cData = CLASSES[p.classKey];
+                const hpPercent = Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100));
+                const bgGradient = p.isHuman
+                    ? `linear-gradient(to top, rgba(16, 185, 129, 0.8) ${hpPercent}%, rgba(15, 23, 42, 0.7) ${hpPercent}%)`
+                    : `linear-gradient(to top, rgba(239, 68, 68, 0.8) ${hpPercent}%, rgba(15, 23, 42, 0.7) ${hpPercent}%)`;
+
+                const isActiveTurn = (activePlayerId !== null && p.id === activePlayerId);
+
+                const unitEl = document.createElement('div');
+                unitEl.className = `character-avatar absolute inset-1 rounded-full border-2 ${
+                    isActiveTurn ? 'active-turn-avatar' : (p.isHuman ? 'border-emerald-400' : 'border-red-400')
+                } flex items-center justify-center text-white shadow-lg transition-all duration-300`;
+                unitEl.style.background = bgGradient;
+
+                unitEl.innerHTML = renderIcon(cData.icon, 'text-xs');
+                cell.appendChild(unitEl);
+            });
+
+            updateActivePlayerInfo();
+            renderTurnOrderUI();
+        }
+
+        function startNewRound() {
+            document.getElementById('round-number').innerText = roundNumber;
+            const aliveIds = players.filter(p => p.alive).map(p => p.id);
+            turnOrder = aliveIds.sort(() => Math.random() - 0.5);
+            currentTurnIdx = 0;
+
+            const orderNames = turnOrder.map(id => players[id].name).join("➔");
+            logCombat(`--- 第 ${roundNumber} 輪！順序: [ ${orderNames} ] ---`);
+
+            renderTurnOrderUI();
+            processNextTurn();
+        }
+
+        function renderTurnOrderUI() {
+            const container = document.getElementById('turn-order-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            turnOrder.forEach((pId, idx) => {
+                const p = players[pId];
+                const cData = CLASSES[p.classKey];
+                const isActive = idx === currentTurnIdx;
+
+                const badge = document.createElement('div');
+                badge.className = `px-2 py-0.5 rounded-md border-2 flex flex-col items-center justify-center text-[10px] whitespace-nowrap transition shrink-0 ${
+                    isActive ? 'bg-indigo-600 border-indigo-900 text-white font-bold ring-2 ring-indigo-400' : 'bg-white border-slate-400 text-slate-700 opacity-90'
+                }`;
+                badge.innerHTML = `
+                    <div class="flex items-center space-x-1">
+                        ${renderIcon(cData.icon)}<span>${p.name}</span>
+                    </div>
+                    <div class="${p.isHuman ? (isActive ? 'text-emerald-200' : 'text-emerald-600') : (isActive ? 'text-red-200' : 'text-red-600')} font-bold text-[9px] leading-none mt-0.5">
+                        ${formatHp(p.hp)}HP
+                    </div>
+                `;
+                container.appendChild(badge);
+            });
+        }
+
+        async function processNextTurn() {
+            if (checkGameOver()) return;
+
+            if (currentTurnIdx >= turnOrder.length) {
+                roundNumber++;
+                startNewRound();
+                return;
+            }
+
+            renderTurnOrderUI();
+            const activePlayer = players[turnOrder[currentTurnIdx]];
+
+            document.getElementById('game-phase-text').innerText = `${activePlayer.name} 回合`;
+            logCombat(`>>> 輪到 ${activePlayer.name} (HP: ${formatHp(activePlayer.hp)})`);
+
+            updateBoardElements();
+
+            await phase1RollDice(activePlayer);
+        }
+
+        async function phase1RollDice(player) {
+            const sessionAtStart = currentGameSessionId;
+            const cData = CLASSES[player.classKey];
+            const sanitizedHp = Math.round(player.hp * 100) / 100;
+            const diceCount = player.alive ? Math.max(1, Math.floor(sanitizedHp)) : 0;
+            const container = document.getElementById('dice-pool-container');
+
+            document.getElementById('dice-count-badge').innerText = `擲骰中...`;
+
+            rolledDicePool = [];
+            for (let i = 0; i < diceCount; i++) {
+                const randomSideIdx = Math.floor(Math.random() * cData.diceSides.length);
+                rolledDicePool.push({ ...cData.diceSides[randomSideIdx], id: i, used: false, diceType: cData.diceType });
+            }
+
+            for (let i = 0; i < 5; i++) {
+                if (currentGameSessionId !== sessionAtStart) return;
+                Sound.playRoll();
+                container.innerHTML = '';
+                for (let d = 0; d < diceCount; d++) {
+                    const tempSide = cData.diceSides[Math.floor(Math.random() * cData.diceSides.length)];
+                    if (cData.diceType === 'D6') {
+                        container.innerHTML += `
+                            <div class="dice-d6 ${tempSide.color} text-white rolling-dice !w-9 !h-9">
+                                ${renderIcon(tempSide.icon, 'text-xs')}
+                            </div>
+                        `;
+                    } else {
+                        const fillColor = COLOR_HEX_MAP[tempSide.color] || '#f59e0b';
+                        container.innerHTML += `
+                            <div class="relative w-9 h-9 text-white rolling-dice flex-shrink-0">
+                                <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 36 36">
+                                    <polygon points="18,2 34,34 2,34" fill="${fillColor}" stroke="#0f172a" stroke-width="2.5" stroke-linejoin="round"/>
+                                </svg>
+                                <div class="relative z-10 flex flex-col items-center justify-end pb-1.5 h-full w-full">
+                                    ${renderIcon(tempSide.icon, 'text-xs')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                await new Promise(r => setTimeout(r, 70));
+            }
+
+            if (currentGameSessionId !== sessionAtStart) return;
+            renderDicePoolUI();
+
+            if (player.isHuman) {
+                document.getElementById('btn-end-turn').disabled = false;
+            } else {
+                document.getElementById('btn-end-turn').disabled = true;
+                await runAITurn(player);
+            }
+        }
+
+        function renderDicePoolUI() {
+            const container = document.getElementById('dice-pool-container');
+            if (!turnOrder || turnOrder.length === 0 || currentTurnIdx >= turnOrder.length) return;
+            const activePlayer = players[turnOrder[currentTurnIdx]];
+            if (!activePlayer) return;
+
+            const usableCount = rolledDicePool.filter(d => !d.used).length;
+            document.getElementById('dice-count-badge').innerText = `${usableCount} 可用`;
+            container.innerHTML = '';
+
+            if (rolledDicePool.length === 0 || usableCount === 0) {
+                container.innerHTML = `<span class="text-xs text-slate-500">無可用骰子</span>`;
+                return;
+            }
+
+            rolledDicePool.forEach((dice, idx) => {
+                const isSelected = selectedDiceIdx === idx;
+                const diceBtn = document.createElement('button');
+                diceBtn.disabled = dice.used || !activePlayer.isHuman || isExecutingAction;
+
+                if (dice.diceType === 'D6') {
+                    diceBtn.className = `dice-d6 ${dice.color} text-white transition ${
+                        dice.used ? '!opacity-20 !brightness-50 cursor-not-allowed border-transparent grayscale' : 'cursor-pointer opacity-90'
+                    } ${isSelected ? 'ring-2 ring-yellow-300' : ''}`;
+                    diceBtn.onclick = () => selectDiceForHuman(idx);
+                    diceBtn.innerHTML = `
+                        ${renderIcon(dice.icon, 'text-xs')}
+                        <span class="text-[8px] font-bold mt-0.5">${dice.label}</span>
+                    `;
+                } else {
+                    const fillColor = COLOR_HEX_MAP[dice.color] || '#f59e0b';
+                    diceBtn.className = `relative w-9 h-9 text-white transition flex items-center justify-center ${
+                        dice.used ? '!opacity-20 !brightness-50 cursor-not-allowed grayscale' : 'cursor-pointer opacity-90'
+                    } ${isSelected ? 'filter drop-shadow-[0_0_4px_rgba(253,224,71,0.9)]' : ''}`;
+                    diceBtn.onclick = () => selectDiceForHuman(idx);
+                    diceBtn.innerHTML = `
+                        <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 36 36">
+                            <polygon points="18,2 34,34 2,34" fill="${fillColor}" stroke="#0f172a" stroke-width="2.5" stroke-linejoin="round"/>
+                        </svg>
+                        <div class="relative z-10 flex flex-col items-center justify-end pb-1 h-full w-full">
+                            ${renderIcon(dice.icon, 'text-[10px]')}
+                            <span class="text-[8px] font-bold leading-tight mt-0.5">${dice.label}</span>
+                        </div>
+                    `;
+                }
+                container.appendChild(diceBtn);
+            });
+        }
+
+        function selectDiceForHuman(diceIdx) {
+            if (isExecutingAction) return;
+            clearBoardHighlights();
+            if (rolledDicePool[diceIdx].used) return;
+
+            if (selectedDiceIdx === diceIdx) {
+                selectedDiceIdx = null;
+            } else {
+                selectedDiceIdx = diceIdx;
+                const dice = rolledDicePool[selectedDiceIdx];
+                const p = players[turnOrder[currentTurnIdx]];
+
+                if (dice.type === 'HEAL') {
+                    logCombat("💡 提示：請點擊棋盤上自己的位置來進行 1 HP 回血");
+                } else if (dice.type === 'ATTACK' || dice.type === 'SKILL') {
+                    const targets = getValidTargetsForClass(p, dice.type);
+                    if (targets.length === 0) {
+                        logCombat("⚠️ 提示：當前範圍內無有效目標/空格");
+                    }
+                }
+                highlightValidActionsForHuman();
+            }
+            renderDicePoolUI();
+        }
+
+        async function showHitCheckModal(attacker, roll, isHit, cData) {
+            const sessionAtStart = currentGameSessionId;
+            const statusBox = document.getElementById('inline-roll-status');
+            if (!statusBox) return;
+            statusBox.classList.remove('invisible');
+
+            const isD4 = cData.diceType === 'D4';
+
+            try {
+                for (let i = 0; i < 4; i++) {
+                    if (currentGameSessionId !== sessionAtStart) return;
+                    Sound.playRoll();
+                    const tempVal = Math.floor(Math.random() * (isD4 ? 4 : 6)) + 1;
+                    if (isD4) {
+                        statusBox.innerHTML = `
+                            <span class="text-[10px] text-indigo-900 font-bold">${attacker.name}:</span>
+                            <div class="relative w-6 h-6 text-white rolling-dice flex items-center justify-center">
+                                <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 24 24">
+                                    <polygon points="12,1 23,22 1,22" fill="#d97706" stroke="#0f172a" stroke-width="2" stroke-linejoin="round"/>
+                                </svg>
+                                <div class="relative z-10 flex items-center justify-center pt-1.5 h-full w-full text-[10px] font-black">${tempVal}</div>
+                            </div>
+                        `;
+                    } else {
+                        statusBox.innerHTML = `
+                            <span class="text-[10px] text-indigo-900 font-bold">${attacker.name}:</span>
+                            <div class="w-5 h-5 bg-amber-600 border-2 border-slate-900 rounded flex items-center justify-center text-[11px] font-black text-white rolling-dice">${tempVal}</div>
+                        `;
+                    }
+                    await new Promise(r => setTimeout(r, 70));
+                }
+
+                if (currentGameSessionId !== sessionAtStart) return;
+
+                if (isD4) {
+                    statusBox.innerHTML = `
+                        <span class="text-[10px] text-indigo-900 font-bold">${attacker.name}:</span>
+                        <div class="relative w-6 h-6 text-white flex items-center justify-center">
+                            <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 24 24">
+                                <polygon points="12,1 23,22 1,22" fill="${isHit ? '#059669' : '#dc2626'}" stroke="#0f172a" stroke-width="2" stroke-linejoin="round"/>
+                            </svg>
+                            <div class="relative z-10 flex items-center justify-center pt-1.5 h-full w-full text-[10px] font-black">${roll}</div>
+                        </div>
+                        <span class="text-[10px] font-bold ${isHit ? 'text-emerald-700' : 'text-red-700'}">${isHit ? '命中!' : '閃避!'}</span>
+                    `;
+                } else {
+                    statusBox.innerHTML = `
+                        <span class="text-[10px] text-indigo-900 font-bold">${attacker.name}:</span>
+                        <div class="w-5 h-5 ${isHit ? 'bg-emerald-600' : 'bg-red-600'} border-2 border-slate-900 rounded flex items-center justify-center text-[11px] font-black text-white">${roll}</div>
+                        <span class="text-[10px] font-bold ${isHit ? 'text-emerald-700' : 'text-red-700'}">${isHit ? '命中!' : '閃避!'}</span>
+                    `;
+                }
+                await new Promise(r => setTimeout(r, 600));
+            } finally {
+                statusBox.classList.add('invisible');
+                statusBox.innerHTML = '';
+            }
+        }
+
+        function confirmResetGame() {
+            const modal = document.getElementById('confirm-reset-modal');
+            if (modal) modal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeResetConfirm() {
+            const modal = document.getElementById('confirm-reset-modal');
+            if (modal) modal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function executeResetGame() {
+            closeResetConfirm();
+            initGame();
+        }
+
+        function getValidTargetsForClass(p, actionType = 'ATTACK', customPos = null) {
+            const targets = [];
+            const activeR = customPos ? customPos.r : p.r;
+            const activeC = customPos ? customPos.c : p.c;
+
+            if (p.classKey === 'warrior') {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const nr = activeR + dr, nc = activeC + dc;
+                        if (isValidGrid(nr, nc)) {
+                            const enemy = getPlayerAt(nr, nc);
+                            const obs = obstacles[`${nr},${nc}`];
+                            if ((enemy && enemy.id !== p.id && enemy.alive) || (obs && obs.hp > 0)) {
+                                targets.push({ r: nr, c: nc, target: enemy || obs, isObstacle: !!obs });
+                            }
+                        }
+                    }
+                }
+            } else if (p.classKey === 'tank') {
+                const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                dirs.forEach(d => {
+                    const nr = activeR + d.r, nc = activeC + d.c;
+                    if (isValidGrid(nr, nc)) {
+                        const enemy = getPlayerAt(nr, nc);
+                        const obs = obstacles[`${nr},${nc}`];
+                        if ((enemy && enemy.id !== p.id && enemy.alive) || (obs && obs.hp > 0)) {
+                            targets.push({ r: nr, c: nc, target: enemy || obs, isObstacle: !!obs });
+                        }
+                    }
+                });
+            } else if (p.classKey === 'mage') {
+                if (actionType === 'ATTACK') {
+                    players.forEach(other => {
+                        if (other.id !== p.id && other.alive) {
+                            const dist = Math.abs(other.r - activeR) + Math.abs(other.c - activeC);
+                            if (dist <= 4) targets.push({ r: other.r, c: other.c, target: other, isObstacle: false });
+                        }
+                    });
+                    Object.keys(obstacles).forEach(key => {
+                        if (obstacles[key].hp > 0) {
+                            const [r, c] = key.split(',').map(Number);
+                            const dist = Math.abs(r - activeR) + Math.abs(c - activeC);
+                            if (dist <= 4) targets.push({ r, c, target: obstacles[key], isObstacle: true });
+                        }
+                    });
+                } else {
+                    players.forEach(other => {
+                        if (other.id !== p.id && other.alive) targets.push({ r: other.r, c: other.c, target: other, isObstacle: false });
+                    });
+                    Object.keys(obstacles).forEach(key => {
+                        if (obstacles[key].hp > 0) {
+                            const [r, c] = key.split(',').map(Number);
+                            targets.push({ r, c, target: obstacles[key], isObstacle: true });
+                        }
+                    });
+                }
+            } else if (p.classKey === 'archer') {
+                const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}, {r:-1,c:-1}, {r:-1,c:1}, {r:1,c:-1}, {r:1,c:1}];
+                dirs.forEach(d => {
+                    let step = 1;
+                    while (true) {
+                        const nr = activeR + d.r * step, nc = activeC + d.c * step;
+                        if (!isValidGrid(nr, nc)) break;
+                        const enemy = getPlayerAt(nr, nc);
+                        const obs = obstacles[`${nr},${nc}`];
+
+                        if (enemy && enemy.alive) {
+                            if (enemy.id !== p.id) {
+                                targets.push({ r: nr, c: nc, target: enemy, isObstacle: false });
+                            }
+                            break;
+                        }
+                        if (obs && obs.hp > 0) {
+                            targets.push({ r: nr, c: nc, target: obs, isObstacle: true });
+                            break;
+                        }
+                        step++;
+                    }
+                });
+            } else if (p.classKey === 'assassin') {
+                if (actionType === 'ATTACK') {
+                    const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                    dirs.forEach(d => {
+                        const nr = activeR + d.r, nc = activeC + d.c;
+                        if (isValidGrid(nr, nc)) {
+                            const enemy = getPlayerAt(nr, nc);
+                            const obs = obstacles[`${nr},${nc}`];
+                            if ((enemy && enemy.id !== p.id && enemy.alive) || (obs && obs.hp > 0)) {
+                                targets.push({ r: nr, c: nc, target: enemy || obs, isObstacle: !!obs });
+                            }
+                        }
+                    });
+                } else if (actionType === 'SKILL') {
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            const dist = Math.abs(r - activeR) + Math.abs(c - activeC);
+                            if (dist >= 1 && dist <= 2 && !isOccupied(r, c)) {
+                                targets.push({ r, c, isEmptySpace: true });
+                            }
+                        }
+                    }
+                }
+            } else if (p.classKey === 'berserker') {
+                if (actionType === 'SKILL') {
+                    const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                    dirs.forEach(d => {
+                        const nr = activeR + d.r, nc = activeC + d.c;
+                        if (isValidGrid(nr, nc)) {
+                            const enemy = getPlayerAt(nr, nc);
+                            const obs = obstacles[`${nr},${nc}`];
+                            if ((enemy && enemy.id !== p.id && enemy.alive) || (obs && obs.hp > 0)) {
+                                targets.push({ r: nr, c: nc, target: enemy || obs, isObstacle: !!obs });
+                            }
+                        }
+                    });
+                }
+            } else if (p.classKey === 'scout') {
+                if (actionType === 'ATTACK') {
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            const dist = Math.abs(r - activeR) + Math.abs(c - activeC);
+                            if (dist >= 1 && dist <= 2) {
+                                const enemy = getPlayerAt(r, c);
+                                const obs = obstacles[`${r},${c}`];
+                                if ((enemy && enemy.id !== p.id && enemy.alive) || (obs && obs.hp > 0)) {
+                                    targets.push({ r, c, target: enemy || obs, isObstacle: !!obs });
+                                }
+                            }
+                        }
+                    }
+                } else if (actionType === 'SKILL') {
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            const dist = Math.abs(r - activeR) + Math.abs(c - activeC);
+                            if (dist >= 1 && dist <= 3 && !isOccupied(r, c)) {
+                                targets.push({ r, c, isEmptySpace: true });
+                            }
+                        }
+                    }
+                }
+            } else if (p.classKey === 'ninja') {
+                if (actionType === 'ATTACK') {
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            const dist = Math.abs(r - activeR) + Math.abs(c - activeC);
+                            if (dist >= 1 && dist <= 2) {
+                                const enemy = getPlayerAt(r, c);
+                                const obs = obstacles[`${r},${c}`];
+                                if ((enemy && enemy.id !== p.id && enemy.alive) || (obs && obs.hp > 0)) {
+                                    targets.push({ r, c, target: enemy || obs, isObstacle: !!obs });
+                                }
+                            }
+                        }
+                    }
+                } else if (actionType === 'SKILL') {
+                    Object.keys(obstacles).forEach(key => {
+                        if (obstacles[key].hp > 0) {
+                            const [r, c] = key.split(',').map(Number);
+                            const dist = Math.abs(r - activeR) + Math.abs(c - activeC);
+                            if (dist >= 1 && dist <= 2) {
+                                targets.push({ r, c, target: obstacles[key], isObstacle: true });
+                            }
+                        }
+                    });
+                }
+            } else if (p.classKey === 'alchemist') {
+                if (actionType === 'ATTACK') {
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+                            const nr = activeR + dr, nc = activeC + dc;
+                            if (isValidGrid(nr, nc)) {
+                                const enemy = getPlayerAt(nr, nc);
+                                const obs = obstacles[`${nr},${nc}`];
+                                if ((enemy && enemy.id !== p.id && enemy.alive) || (obs && obs.hp > 0)) {
+                                    targets.push({ r: nr, c: nc, target: enemy || obs, isObstacle: !!obs });
+                                }
+                            }
+                        }
+                    }
+                } else if (actionType === 'SKILL') {
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+                            const nr = activeR + dr, nc = activeC + dc;
+                            if (isValidGrid(nr, nc) && !isOccupied(nr, nc)) {
+                                targets.push({ r: nr, c: nc, isEmptySpace: true });
+                            }
+                        }
+                    }
+                }
+            }
+            return targets;
+        }
+
+        function clearBoardHighlights() {
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('valid-move', 'valid-heal', 'valid-target', 'valid-skill'));
+        }
+
+        function highlightValidActionsForHuman() {
+            clearBoardHighlights();
+            if (selectedDiceIdx === null) return;
+            const activePlayer = players[turnOrder[currentTurnIdx]];
+            if (!activePlayer || !activePlayer.isHuman) return;
+
+            const dice = rolledDicePool[selectedDiceIdx];
+            if (!dice || dice.used) return;
+
+            if (dice.type === 'MOVE') {
+                const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                dirs.forEach(d => {
+                    const nr = activePlayer.r + d.r;
+                    const nc = activePlayer.c + d.c;
+                    if (isValidGrid(nr, nc) && !isOccupied(nr, nc)) {
+                        const cell = document.getElementById(`cell-${nr}-${nc}`);
+                        if (cell) cell.classList.add('valid-move');
+                    }
+                });
+            } else if (dice.type === 'HEAL') {
+                const cell = document.getElementById(`cell-${activePlayer.r}-${activePlayer.c}`);
+                if (cell) cell.classList.add('valid-heal');
+            } else if (dice.type === 'ATTACK') {
+                const targets = getValidTargetsForClass(activePlayer, 'ATTACK');
+                targets.forEach(t => {
+                    const cell = document.getElementById(`cell-${t.r}-${t.c}`);
+                    if (cell) cell.classList.add('valid-target');
+                });
+            } else if (dice.type === 'SKILL') {
+                const targets = getValidTargetsForClass(activePlayer, 'SKILL');
+                targets.forEach(t => {
+                    const cell = document.getElementById(`cell-${t.r}-${t.c}`);
+                    if (cell) cell.classList.add('valid-skill');
+                });
+            }
+        }
+
+        async function handleCellClick(r, c) {
+            const activePlayer = players[turnOrder[currentTurnIdx]];
+            if (!activePlayer || !activePlayer.isHuman || selectedDiceIdx === null || isExecutingAction) return;
+
+            const dice = rolledDicePool[selectedDiceIdx];
+            if (!dice || dice.used) return;
+
+            if (dice.type === 'MOVE') {
+                const dist = Math.abs(r - activePlayer.r) + Math.abs(c - activePlayer.c);
+                if (dist === 1 && !isOccupied(r, c)) {
+                    await executeMoveAction(activePlayer, r, c);
+                }
+            } else if (dice.type === 'HEAL') {
+                if (r === activePlayer.r && c === activePlayer.c) {
+                    await executeHealAction(activePlayer);
+                }
+            } else if (dice.type === 'ATTACK') {
+                const targets = getValidTargetsForClass(activePlayer, 'ATTACK');
+                const match = targets.find(t => t.r === r && t.c === c);
+                if (match) {
+                    await executeAttackAction(activePlayer, match, 'ATTACK');
+                }
+            } else if (dice.type === 'SKILL') {
+                const targets = getValidTargetsForClass(activePlayer, 'SKILL');
+                const match = targets.find(t => t.r === r && t.c === c);
+                if (match) {
+                    await executeSkillAction(activePlayer, match);
+                }
+            }
+        }
+
+        async function executeMoveAction(player, targetR, targetC) {
+            isExecutingAction = true;
+            renderDicePoolUI();
+            try {
+                player.r = targetR;
+                player.c = targetC;
+                updateBoardElements();
+                logCombat(`👟 ${player.name} 移動至 (${targetR + 1}, ${targetC + 1})`);
+                consumeSelectedDice();
+                clearBoardHighlights();
+            } finally {
+                isExecutingAction = false;
+                renderDicePoolUI();
+            }
+        }
+
+        async function executeHealAction(player) {
+            isExecutingAction = true;
+            renderDicePoolUI();
+            try {
+                if (player.hp < player.maxHp) {
+                    player.hp = Math.min(player.maxHp, Math.round((player.hp + 1) * 10) / 10);
+                    Sound.playHeal();
+                    showFloatingText(player.r, player.c, "+1", "floating-heal");
+                    logCombat(`💖 ${player.name} 回復 1 點 HP (${formatHp(player.hp)}/${player.maxHp})`);
+                } else {
+                    logCombat(`💖 ${player.name} 血量已滿，回血無效`);
+                }
+                updateBoardElements();
+                consumeSelectedDice();
+                clearBoardHighlights();
+            } finally {
+                isExecutingAction = false;
+                renderDicePoolUI();
+            }
+        }
+
+        async function executeAttackAction(attacker, targetObj, actionType = 'ATTACK') {
+            isExecutingAction = true;
+            renderDicePoolUI();
+            clearBoardHighlights();
+            try {
+                const validTargets = getValidTargetsForClass(attacker, actionType);
+                const isValid = validTargets.some(t => t.r === targetObj.r && t.c === targetObj.c);
+                if (!isValid) {
+                    logCombat(`⚠️ ${attacker.name} 目標不在有效射程內，行動取消`);
+                    consumeSelectedDice();
+                    return;
+                }
+
+                const cData = CLASSES[attacker.classKey];
+                logCombat(`⚔️ ${attacker.name} 發動【普通攻擊】！`);
+
+                await playAttackTrajectoryAnimation(attacker, targetObj.r, targetObj.c);
+
+                const diceType = cData.diceType;
+                const maxRoll = diceType === 'D6' ? 6 : 4;
+                const rollResult = Math.floor(Math.random() * maxRoll) + 1;
+                const isHit = rollResult >= cData.minHit;
+
+                await showHitCheckModal(attacker, rollResult, isHit, cData);
+
+                let damageAmount = 1;
+                if (attacker.classKey === 'scout' && actionType === 'ATTACK') {
+                    damageAmount = 0.7;
+                } else if (attacker.classKey === 'ninja' && actionType === 'ATTACK') {
+                    damageAmount = 0.7;
+                }
+
+                if (isHit) {
+                    Sound.playHit();
+                    logCombat(`🎯 命中！擲出 ${rollResult} (需要: ${cData.hitDesc})`);
+                    if (attacker.classKey === 'warrior') {
+                        let warriorTargets = getValidTargetsForClass(attacker, actionType);
+                        warriorTargets.forEach(t => applyDamage(t.target, damageAmount, t.r, t.c, t.isObstacle, attacker));
+                    } else {
+                        applyDamage(targetObj.target, damageAmount, targetObj.r, targetObj.c, targetObj.isObstacle, attacker);
+                    }
+                } else {
+                    Sound.playMiss();
+                    logCombat(`🌀 未命中！擲出 ${rollResult} (需要: ${cData.hitDesc})`);
+                    showFloatingText(targetObj.r, targetObj.c, "MISS!", "floating-miss");
+                }
+
+                consumeSelectedDice();
+                updateBoardElements();
+            } finally {
+                isExecutingAction = false;
+                renderDicePoolUI();
+            }
+        }
+
+        async function executeSkillAction(attacker, targetObj) {
+            isExecutingAction = true;
+            renderDicePoolUI();
+            clearBoardHighlights();
+            try {
+                const cData = CLASSES[attacker.classKey];
+                logCombat(`✨ ${attacker.name} 選擇目標 (${targetObj.r + 1}, ${targetObj.c + 1}) 發動【特殊技能】！`);
+
+                const diceType = cData.diceType;
+                const maxRoll = diceType === 'D6' ? 6 : 4;
+                const rollResult = Math.floor(Math.random() * maxRoll) + 1;
+                const isHit = rollResult >= cData.minHit;
+
+                await showHitCheckModal(attacker, rollResult, isHit, cData);
+
+                if (!isHit) {
+                    Sound.playMiss();
+                    logCombat(`🌀 ${attacker.name} 技能未命中！擲出 ${rollResult} (需要: ${cData.hitDesc})`);
+                    showFloatingText(targetObj.r, targetObj.c, "MISS!", "floating-miss");
+                } else {
+                    Sound.playHit();
+                    logCombat(`🎯 技能命中！擲出 ${rollResult} (需要: ${cData.hitDesc})`);
+
+                    if (attacker.classKey === 'assassin') {
+                        attacker.r = targetObj.r;
+                        attacker.c = targetObj.c;
+                        updateBoardElements();
+                        logCombat(`🔮 刺客瞬移至 (${targetObj.r + 1}, ${targetObj.c + 1})！`);
+
+                        if (attacker.hp < attacker.maxHp) {
+                            attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 0.5) * 10) / 10);
+                            Sound.playHeal();
+                            showFloatingText(attacker.r, attacker.c, "+0.5", "floating-heal");
+                            logCombat(`💖 刺客回復 0.5 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
+                        }
+                        
+                        // 刺客技能 AOE 範圍傷害：對新位置上下左右相鄰的所有敵人與障礙物同時造成 1 點傷害
+                        const crossDirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                        crossDirs.forEach(d => {
+                            const nr = attacker.r + d.r, nc = attacker.c + d.c;
+                            if (isValidGrid(nr, nc)) {
+                                const enemy = getPlayerAt(nr, nc);
+                                const obs = obstacles[`${nr},${nc}`];
+                                if (enemy && enemy.id !== attacker.id && enemy.alive) {
+                                    applyDamage(enemy, 1, nr, nc, false, attacker);
+                                } else if (obs && obs.hp > 0) {
+                                    applyDamage(obs, 1, nr, nc, true, attacker);
+                                }
+                            }
+                        });
+                    } else if (attacker.classKey === 'berserker') {
+                        await playAttackTrajectoryAnimation(attacker, targetObj.r, targetObj.c);
+                        
+                        if (attacker.hp < attacker.maxHp) {
+                            attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 0.7) * 10) / 10);
+                            Sound.playHeal();
+                            showFloatingText(attacker.r, attacker.c, "+0.7", "floating-heal");
+                            logCombat(`💖 狂戰士觸發血誓，回復 0.7 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
+                        }
+
+                        applyDamage(targetObj.target, 1, targetObj.r, targetObj.c, targetObj.isObstacle, attacker);
+                    } else if (attacker.classKey === 'scout') {
+                        attacker.r = targetObj.r;
+                        attacker.c = targetObj.c;
+                        updateBoardElements();
+                        logCombat(`🏹 斥侯靈活位移至 (${targetObj.r + 1}, ${targetObj.c + 1})！`);
+
+                        if (attacker.hp < attacker.maxHp) {
+                            attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 0.5) * 10) / 10);
+                            Sound.playHeal();
+                            showFloatingText(attacker.r, attacker.c, "+0.5", "floating-heal");
+                            logCombat(`💖 斥侯回復 0.5 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
+                        }
+                    } else if (attacker.classKey === 'mage') {
+                        await playAttackTrajectoryAnimation(attacker, targetObj.r, targetObj.c);
+                        applyDamage(targetObj.target, 1, targetObj.r, targetObj.c, targetObj.isObstacle, attacker);
+                    } else if (attacker.classKey === 'ninja') {
+                        const oldR = attacker.r, oldC = attacker.c;
+                        const newR = targetObj.r, newC = targetObj.c;
+                        const obsKey = `${newR},${newC}`;
+                        const oldKey = `${oldR},${oldC}`;
+                        const obsData = obstacles[obsKey];
+
+                        delete obstacles[obsKey];
+                        if (obsData && typeof obsData === 'object') {
+                            obstacles[oldKey] = obsData;
+                        }
+
+                        attacker.r = newR;
+                        attacker.c = newC;
+                        updateBoardElements();
+                        logCombat(`🥷 忍者使用替身術與 (${newR + 1}, ${newC + 1}) 的障礙物互換位置！`);
+
+                        if (attacker.hp < attacker.maxHp) {
+                            attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 1) * 10) / 10);
+                            Sound.playHeal();
+                            showFloatingText(attacker.r, attacker.c, "+1", "floating-heal");
+                            logCombat(`💖 忍者回復 1 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
+                        }
+
+                        const crossDirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                        crossDirs.forEach(d => {
+                            const nr = attacker.r + d.r, nc = attacker.c + d.c;
+                            if (isValidGrid(nr, nc)) {
+                                const enemy = getPlayerAt(nr, nc);
+                                if (enemy && enemy.id !== attacker.id && enemy.alive) {
+                                    applyDamage(enemy, 0.7, nr, nc, false, attacker);
+                                }
+                            }
+                        });
+                    } else if (attacker.classKey === 'alchemist') {
+                        const newR = targetObj.r, newC = targetObj.c;
+                        obstacles[`${newR},${newC}`] = { hp: 1, maxHp: 1 };
+                        Sound.playBreak();
+                        logCombat(`🧪 鍊金術士於 (${newR + 1}, ${newC + 1}) 調製化合物，生成了 1 HP 的障礙物！`);
+                        showFloatingText(newR, newC, "煉金牆", "floating-heal");
+                    }
+                }
+
+                consumeSelectedDice();
+                updateBoardElements();
+            } finally {
+                isExecutingAction = false;
+                renderDicePoolUI();
+            }
+        }
+
+        async function playAttackTrajectoryAnimation(attacker, targetR, targetC) {
+            const sessionAtStart = currentGameSessionId;
+            const board = document.getElementById('sudoku-board');
+            if (!board) return;
+
+            const x1 = ((attacker.c + 0.5) / 9) * 100;
+            const y1 = ((attacker.r + 0.5) / 9) * 100;
+            const x2 = ((targetC + 0.5) / 9) * 100;
+            const y2 = ((targetR + 0.5) / 9) * 100;
+
+            const svgContainer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svgContainer.setAttribute('class', 'absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible');
+
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+            const markerId = `arrow-${Math.random().toString(36).substring(2, 8)}`;
+            marker.setAttribute('id', markerId);
+            marker.setAttribute('viewBox', '0 0 10 10');
+            marker.setAttribute('refX', '6');
+            marker.setAttribute('refY', '5');
+            marker.setAttribute('markerWidth', '6');
+            marker.setAttribute('markerHeight', '6');
+            marker.setAttribute('orient', 'auto-start-reverse');
+
+            const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            arrowPath.setAttribute('d', 'M 0 1 L 10 5 L 0 9 z');
+            arrowPath.setAttribute('fill', '#f59e0b');
+            marker.appendChild(arrowPath);
+            defs.appendChild(marker);
+            svgContainer.appendChild(defs);
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', `${x1}%`);
+            line.setAttribute('y1', `${y1}%`);
+            line.setAttribute('x2', `${x1}%`);
+            line.setAttribute('y2', `${y1}%`);
+            line.setAttribute('stroke', '#ef4444');
+            line.setAttribute('stroke-width', '3.5');
+            line.setAttribute('stroke-linecap', 'round');
+            line.setAttribute('marker-end', `url(#${markerId})`);
+
+            svgContainer.appendChild(line);
+            board.appendChild(svgContainer);
+
+            const duration = 220;
+            const startTime = performance.now();
+
+            await new Promise(resolve => {
+                function animateFrame(now) {
+                    if (currentGameSessionId !== sessionAtStart) {
+                        svgContainer.remove();
+                        resolve();
+                        return;
+                    }
+                    const elapsed = now - startTime;
+                    const progress = Math.min(1, elapsed / duration);
+
+                    const currentX = x1 + (x2 - x1) * progress;
+                    const currentY = y1 + (y2 - y1) * progress;
+
+                    line.setAttribute('x2', `${currentX}%`);
+                    line.setAttribute('y2', `${currentY}%`);
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animateFrame);
+                    } else {
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(animateFrame);
+            });
+
+            if (currentGameSessionId !== sessionAtStart) return;
+
+            const targetCell = document.getElementById(`cell-${targetR}-${targetC}`);
+            if (targetCell) {
+                const burst = document.createElement('div');
+                burst.className = 'impact-burst';
+                targetCell.appendChild(burst);
+                setTimeout(() => burst.remove(), 400);
+            }
+
+            await new Promise(r => setTimeout(r, 100));
+            svgContainer.remove();
+        }
+
+        function applyDamage(target, amount, r, c, isObstacle, attacker) {
+            target.hp = Math.round((target.hp - amount) * 10) / 10;
+            showFloatingText(r, c, `-${amount}`, "floating-damage");
+
+            if (isObstacle) {
+                logCombat(`💥 障礙物遭受 ${amount} 點傷害 (剩餘 HP: ${Math.max(0, target.hp)})`);
+                if (target.hp <= 0) {
+                    Sound.playBreak();
+                    logCombat(`🧱 障礙物已被摧毀！`);
+                    delete obstacles[`${r},${c}`];
+
+                    if (attacker) {
+                        if (attacker.hp < attacker.maxHp) {
+                            attacker.hp = Math.min(attacker.maxHp, Math.round((attacker.hp + 1) * 10) / 10);
+                            Sound.playHeal();
+                            showFloatingText(attacker.r, attacker.c, "+1", "floating-heal");
+                            logCombat(`💖 ${attacker.name} 擊碎障礙物，回復 1 點 HP (${formatHp(attacker.hp)}/${attacker.maxHp})`);
+                        } else {
+                            logCombat(`💖 ${attacker.name} 擊碎障礙物 (血量已滿，未回復)`);
+                        }
+                    }
+                }
+            } else {
+                logCombat(`🩸 ${target.name} 受到 ${amount} 點傷害 (剩餘 HP: ${Math.max(0, formatHp(target.hp))})`);
+                if (target.hp <= 0) {
+                    target.hp = 0;
+                    target.alive = false;
+                    logCombat(`💀 ${target.name} 陣亡！`);
+                }
+            }
+            updateBoardElements();
+        }
+
+        function showFloatingText(r, c, text, className) {
+            const cell = document.getElementById(`cell-${r}-${c}`);
+            if (!cell) return;
+
+            const el = document.createElement('div');
+            el.className = `floating-text ${className}`;
+            el.innerText = text;
+            cell.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function consumeSelectedDice() {
+            if (selectedDiceIdx !== null && rolledDicePool[selectedDiceIdx]) {
+                rolledDicePool[selectedDiceIdx].used = true;
+                selectedDiceIdx = null;
+            }
+            renderDicePoolUI();
+        }
+
+        function manualEndTurn() {
+            const btn = document.getElementById('btn-end-turn');
+            if (!btn || btn.disabled || isExecutingAction) return;
+
+            btn.disabled = true;
+
+            const activePlayer = players[turnOrder[currentTurnIdx]];
+            if (!activePlayer || !activePlayer.isHuman) return;
+
+            clearBoardHighlights();
+            selectedDiceIdx = null;
+            logCombat(`⏭️ 手動結束回合`);
+            currentTurnIdx++;
+            processNextTurn();
+        }
+
+        /* STREAMING_CHUNK:Implementing A* pathfinding and AI tactical evaluation... */
+        function canUnitHitTargetFrom(unit, r, c, targetR, targetC) {
+            if (!unit) return (Math.abs(r - targetR) + Math.abs(c - targetC) <= 1);
+            const attackTargets = getValidTargetsForClass(unit, 'ATTACK', { r, c });
+            if (attackTargets.some(t => t.r === targetR && t.c === targetC)) return true;
+            const skillTargets = getValidTargetsForClass(unit, 'SKILL', { r, c });
+            if (skillTargets.some(t => t.r === targetR && t.c === targetC)) return true;
+            return false;
+        }
+
+        function findNextStepAStar(startR, startC, targetR, targetC, isFleeing = false, aiPlayer = null) {
+            if (isFleeing) {
+                const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                let candidates = [];
+                let maxDist = -1;
+
+                dirs.forEach(d => {
+                    const nr = startR + d.r, nc = startC + d.c;
+                    if (isValidGrid(nr, nc) && !isOccupied(nr, nc)) {
+                        const dist = Math.abs(nr - targetR) + Math.abs(nc - targetC);
+                        if (dist > maxDist) {
+                            maxDist = dist;
+                            candidates = [{ r: nr, c: nc }];
+                        } else if (dist === maxDist) {
+                            candidates.push({ r: nr, c: nc });
+                        }
+                    }
+                });
+
+                if (candidates.length === 0) return null;
+
+                if (aiPlayer && aiPlayer.classKey === 'archer') {
+                    const inSightCandidates = candidates.filter(c => {
+                        const dr = Math.abs(c.r - targetR);
+                        const dc = Math.abs(c.c - targetC);
+                        return dr === 0 || dc === 0 || dr === dc;
+                    });
+                    if (inSightCandidates.length > 0) {
+                        return inSightCandidates[Math.floor(Math.random() * inSightCandidates.length)];
+                    }
+                } else {
+                    const outOfSightCandidates = candidates.filter(c => {
+                        const dr = Math.abs(c.r - targetR);
+                        const dc = Math.abs(c.c - targetC);
+                        return dr !== 0 && dc !== 0 && dr !== dc;
+                    });
+                    if (outOfSightCandidates.length > 0) {
+                        return outOfSightCandidates[Math.floor(Math.random() * outOfSightCandidates.length)];
+                    }
+                }
+
+                return candidates[Math.floor(Math.random() * candidates.length)];
+            }
+
+            if (startR === targetR && startC === targetC) return null;
+
+            const openSet = [];
+            const closedSet = new Set();
+            const gScore = {};
+            const fScore = {};
+            const cameFrom = {};
+
+            const startKey = `${startR},${startC}`;
+            gScore[startKey] = 0;
+            fScore[startKey] = Math.abs(startR - targetR) + Math.abs(startC - targetC);
+            openSet.push({ r: startR, c: startC, f: fScore[startKey] });
+
+            while (openSet.length > 0) {
+                openSet.sort((a, b) => a.f - b.f);
+                const current = openSet.shift();
+                const currentKey = `${current.r},${current.c}`;
+
+                if (canUnitHitTargetFrom(aiPlayer, current.r, current.c, targetR, targetC)) {
+                    let curr = currentKey;
+                    let path = [];
+                    while (cameFrom[curr]) {
+                        path.push(curr);
+                        curr = cameFrom[curr];
+                    }
+                    if (path.length > 0) {
+                        const firstStep = path[path.length - 1].split(',').map(Number);
+                        return { r: firstStep[0], c: firstStep[1] };
+                    }
+                    return null;
+                }
+
+                closedSet.add(currentKey);
+
+                const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                dirs.forEach(d => {
+                    const nr = current.r + d.r, nc = current.c + d.c;
+                    const neighborKey = `${nr},${nc}`;
+
+                    if (!isValidGrid(nr, nc) || closedSet.has(neighborKey)) return;
+
+                    const isTargetTile = (nr === targetR && nc === targetC);
+                    if (isOccupied(nr, nc) && !isTargetTile) return;
+
+                    const tentativeG = gScore[currentKey] + 1;
+                    if (gScore[neighborKey] === undefined || tentativeG < gScore[neighborKey]) {
+                        cameFrom[neighborKey] = currentKey;
+                        gScore[neighborKey] = tentativeG;
+                        const h = Math.abs(nr - targetR) + Math.abs(nc - targetC);
+                        fScore[neighborKey] = tentativeG + h;
+
+                        if (!openSet.some(node => node.r === nr && node.c === nc)) {
+                            openSet.push({ r: nr, c: nc, f: fScore[neighborKey] });
+                        }
+                    }
+                });
+            }
+
+            const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+            let fallbackCell = null;
+            let minDist = 999;
+            dirs.forEach(d => {
+                const nr = startR + d.r, nc = startC + d.c;
+                if (isValidGrid(nr, nc) && !isOccupied(nr, nc)) {
+                    const dist = Math.abs(nr - targetR) + Math.abs(nc - targetC);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        fallbackCell = { r: nr, c: nc };
+                    }
+                }
+            });
+            return fallbackCell;
+        }
+
+        async function runAITurn(aiPlayer) {
+            const sessionAtStart = currentGameSessionId;
+            const cData = CLASSES[aiPlayer.classKey];
+
+            function canHitHumanFrom(r, c, actionType) {
+                const human = players.find(p => p.isHuman && p.alive);
+                if (!human) return false;
+                const targets = getValidTargetsForClass(aiPlayer, actionType, { r, c });
+                return targets.some(t => t.target && !t.isObstacle && t.target.isHuman);
+            }
+
+            function isAtOptimalPosition(r, c) {
+                const human = players.find(p => p.isHuman && p.alive);
+                if (!human) return true;
+                const currentDist = Math.abs(human.r - r) + Math.abs(human.c - c);
+
+                if (cData.aiType === 'aggressive') {
+                    return canHitHumanFrom(r, c, 'ATTACK') || canHitHumanFrom(r, c, 'SKILL');
+                } else {
+                    const canHit = canHitHumanFrom(r, c, 'ATTACK') || canHitHumanFrom(r, c, 'SKILL');
+                    if (!canHit) return false;
+
+                    const dirs = [{r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1}];
+                    for (let d of dirs) {
+                        const nr = r + d.r, nc = c + d.c;
+                        if (isValidGrid(nr, nc) && !isOccupied(nr, nc)) {
+                            const nextDist = Math.abs(human.r - nr) + Math.abs(human.c - nc);
+                            if (nextDist > currentDist) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }
+            }
+
+            while (aiPlayer.alive) {
+                if (currentGameSessionId !== sessionAtStart) return;
+
+                const unusedDice = rolledDicePool.filter(d => !d.used);
+                if (unusedDice.length === 0) break;
+
+                const humanPlayer = players.find(p => p.isHuman && p.alive);
+                if (!humanPlayer) break;
+
+                if (aiPlayer.hp < aiPlayer.maxHp) {
+                    const healDice = unusedDice.find(d => d.type === 'HEAL');
+                    if (healDice) {
+                        selectedDiceIdx = rolledDicePool.findIndex(d => d === healDice);
+                        await new Promise(r => setTimeout(r, 400));
+                        if (currentGameSessionId !== sessionAtStart) return;
+                        await executeHealAction(aiPlayer);
+                        if (checkGameOver()) return;
+                        continue;
+                    }
+                }
+
+                const skillDice = unusedDice.find(d => d.type === 'SKILL');
+                const attackDice = unusedDice.find(d => d.type === 'ATTACK');
+
+                if (aiPlayer.classKey === 'ninja' && skillDice) {
+                    const skillObs = getValidTargetsForClass(aiPlayer, 'SKILL');
+                    if (skillObs.length > 0) {
+                        const chosenObs = findClosestSpaceToTarget(skillObs, humanPlayer.r, humanPlayer.c);
+                        if (chosenObs) {
+                            selectedDiceIdx = rolledDicePool.findIndex(d => d === skillDice);
+                            await new Promise(r => setTimeout(r, 450));
+                            if (currentGameSessionId !== sessionAtStart) return;
+                            await executeSkillAction(aiPlayer, chosenObs);
+                            if (checkGameOver()) return;
+                            continue;
+                        }
+                    }
+                }
+
+                if (aiPlayer.classKey === 'alchemist' && skillDice) {
+                    const skillSpaces = getValidTargetsForClass(aiPlayer, 'SKILL');
+                    if (skillSpaces.length > 0) {
+                        const chosenSpace = findClosestSpaceToTarget(skillSpaces, humanPlayer.r, humanPlayer.c);
+                        if (chosenSpace) {
+                            selectedDiceIdx = rolledDicePool.findIndex(d => d === skillDice);
+                            await new Promise(r => setTimeout(r, 450));
+                            if (currentGameSessionId !== sessionAtStart) return;
+                            await executeSkillAction(aiPlayer, chosenSpace);
+                            if (checkGameOver()) return;
+                            continue;
+                        }
+                    }
+                }
+
+                if (aiPlayer.classKey === 'assassin' && skillDice) {
+                    const skillSpaces = getValidTargetsForClass(aiPlayer, 'SKILL');
+                    if (skillSpaces.length > 0) {
+                        const directHitSpace = skillSpaces.find(s => {
+                            const distToHuman = Math.abs(s.r - humanPlayer.r) + Math.abs(s.c - humanPlayer.c);
+                            return distToHuman === 1;
+                        });
+
+                        const chosenSpace = directHitSpace || findClosestSpaceToTarget(skillSpaces, humanPlayer.r, humanPlayer.c);
+
+                        if (chosenSpace) {
+                            selectedDiceIdx = rolledDicePool.findIndex(d => d === skillDice);
+                            await new Promise(r => setTimeout(r, 450));
+                            if (currentGameSessionId !== sessionAtStart) return;
+                            await executeSkillAction(aiPlayer, chosenSpace);
+                            if (checkGameOver()) return;
+                            continue;
+                        }
+                    }
+                }
+
+                if (aiPlayer.classKey === 'scout' && skillDice) {
+                    const skillSpaces = getValidTargetsForClass(aiPlayer, 'SKILL');
+                    if (skillSpaces.length > 0) {
+                        let maxDist = -1;
+                        let farthestSpaces = [];
+                        skillSpaces.forEach(space => {
+                            const d = Math.abs(space.r - humanPlayer.r) + Math.abs(space.c - humanPlayer.c);
+                            if (d > maxDist) {
+                                maxDist = d;
+                                farthestSpaces = [space];
+                            } else if (d === maxDist) {
+                                farthestSpaces.push(space);
+                            }
+                        });
+                        const targetSpace = farthestSpaces[Math.floor(Math.random() * farthestSpaces.length)];
+
+                        selectedDiceIdx = rolledDicePool.findIndex(d => d === skillDice);
+                        await new Promise(r => setTimeout(r, 450));
+                        if (currentGameSessionId !== sessionAtStart) return;
+                        await executeSkillAction(aiPlayer, targetSpace);
+                        if (checkGameOver()) return;
+                        continue;
+                    }
+                }
+
+                if (skillDice && canHitHumanFrom(aiPlayer.r, aiPlayer.c, 'SKILL')) {
+                    const targets = getValidTargetsForClass(aiPlayer, 'SKILL');
+                    const humanTarget = targets.find(t => !t.isObstacle && t.target && t.target.isHuman);
+                    if (humanTarget) {
+                        selectedDiceIdx = rolledDicePool.findIndex(d => d === skillDice);
+                        await new Promise(r => setTimeout(r, 450));
+                        if (currentGameSessionId !== sessionAtStart) return;
+                        await executeSkillAction(aiPlayer, humanTarget);
+                        if (checkGameOver()) return;
+                        continue;
+                    }
+                }
+
+                if (attackDice && canHitHumanFrom(aiPlayer.r, aiPlayer.c, 'ATTACK')) {
+                    const targets = getValidTargetsForClass(aiPlayer, 'ATTACK');
+                    const humanTarget = targets.find(t => !t.isObstacle && t.target && t.target.isHuman);
+                    if (humanTarget) {
+                        selectedDiceIdx = rolledDicePool.findIndex(d => d === attackDice);
+                        await new Promise(r => setTimeout(r, 450));
+                        if (currentGameSessionId !== sessionAtStart) return;
+                        await executeAttackAction(aiPlayer, humanTarget, 'ATTACK');
+                        if (checkGameOver()) return;
+                        continue;
+                    }
+                }
+
+                const moveDice = unusedDice.find(d => d.type === 'MOVE');
+                if (moveDice && !isAtOptimalPosition(aiPlayer.r, aiPlayer.c)) {
+                    const isFleeing = (cData.aiType === 'fleeing');
+                    const nextStep = findNextStepAStar(aiPlayer.r, aiPlayer.c, humanPlayer.r, humanPlayer.c, isFleeing, aiPlayer);
+
+                    if (nextStep) {
+                        selectedDiceIdx = rolledDicePool.findIndex(d => d === moveDice);
+                        await new Promise(r => setTimeout(r, 400));
+                        if (currentGameSessionId !== sessionAtStart) return;
+                        await executeMoveAction(aiPlayer, nextStep.r, nextStep.c);
+                        if (checkGameOver()) return;
+                        continue;
+                    }
+                }
+
+                selectedDiceIdx = rolledDicePool.findIndex(d => d === unusedDice[0]);
+                consumeSelectedDice();
+                await new Promise(r => setTimeout(r, 150));
+            }
+
+            if (currentGameSessionId !== sessionAtStart) return;
+            logCombat(`🤖 ${aiPlayer.name} 行動結束`);
+            await new Promise(r => setTimeout(r, 300));
+            if (currentGameSessionId !== sessionAtStart) return;
+            currentTurnIdx++;
+            processNextTurn();
+        }
+
+        function isValidGrid(r, c) { return r >= 0 && r < 9 && c >= 0 && c < 9; }
+        function isOccupied(r, c) {
+            const hasPlayer = players.some(p => p.alive && p.r === r && p.c === c);
+            const hasObs = obstacles[`${r},${c}`] && obstacles[`${r},${c}`].hp > 0;
+            return hasPlayer || hasObs;
+        }
+        function getPlayerAt(r, c) { return players.find(p => p.alive && p.r === r && p.c === c); }
+
+        let isLogExpanded = false;
+
+        function toggleCombatLog() {
+            isLogExpanded = !isLogExpanded;
+            const logEl = document.getElementById('combat-log');
+
+            if (isLogExpanded) {
+                logEl.className = "absolute top-0 left-0 w-full h-[235px] z-40 lined-paper-2 text-[11px] text-slate-800 overflow-y-auto font-mono cursor-pointer shadow-2xl transition-all duration-200 select-none";
+            } else {
+                logEl.className = "w-full h-full lined-paper-2 text-[11px] text-slate-800 overflow-hidden font-mono cursor-pointer transition-all duration-200 select-none relative shadow-md";
+            }
+            logEl.scrollTop = logEl.scrollHeight;
+            setTimeout(() => {
+                logEl.scrollTop = logEl.scrollHeight;
+            }, 220);
+        }
+
+        function logCombat(msg) {
+            const contentEl = document.getElementById('combat-log-content');
+            const logEl = document.getElementById('combat-log');
+            if (!contentEl) return;
+
+            const p = document.createElement('p');
+            p.innerText = msg;
+            p.className = 'leading-[22px] h-[22px] truncate font-medium';
+            contentEl.appendChild(p);
+
+            while (contentEl.children.length > 100) {
+                contentEl.removeChild(contentEl.firstChild);
+            }
+
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function checkGameOver() {
+            const human = players.find(p => p.isHuman);
+            const aliveAIs = players.filter(p => !p.isHuman && p.alive);
+
+            if (!human || !human.alive) {
+                showGameOverModal(false);
+                return true;
+            } else if (aliveAIs.length === 0) {
+                showGameOverModal(true);
+                return true;
+            }
+            return false;
+        }
+
+        function showGameOverModal(isVictory) {
+            const modal = document.getElementById('game-over-modal');
+            const icon = document.getElementById('game-over-icon');
+            const title = document.getElementById('game-over-title');
+            const desc = document.getElementById('game-over-desc');
+
+            if (isVictory) {
+                icon.innerText = "🏆";
+                title.innerText = "遊戲勝利！";
+                title.className = "text-xl font-black mb-1 text-emerald-400";
+                desc.innerText = "你展現了高超的戰術，成功殲滅了所有對手！";
+            } else {
+                icon.innerText = "☠️";
+                title.innerText = "戰敗...";
+                title.className = "text-xl font-black mb-1 text-red-500";
+                desc.innerText = "你不幸陣亡，再試一次吧！";
+            }
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        window.onload = function() {
+            initGame();
+        };
+    </script>
+</body>
+</html>
