@@ -734,19 +734,16 @@
         let currentGameSessionId = 0;
         let gameActive = false;
 
-        // --- localStorage 斷線存檔/復原邏輯 ---
+        // --- 固定僅於每輪開始時存檔 ---
         function saveGameState() {
             if (!gameActive) return;
             const state = {
                 gameActive,
                 sudokuGrid,
-                obstacles,
-                players,
+                obstacles: JSON.parse(JSON.stringify(obstacles)),
+                players: JSON.parse(JSON.stringify(players)),
                 roundNumber,
-                turnOrder,
-                currentTurnIdx,
-                rolledDicePool,
-                selectedDiceIdx,
+                turnOrder: [...turnOrder],
                 currentGameSessionId
             };
             try {
@@ -775,29 +772,26 @@
                 players = state.players;
                 roundNumber = state.roundNumber;
                 turnOrder = state.turnOrder;
-                currentTurnIdx = state.currentTurnIdx;
-                rolledDicePool = state.rolledDicePool;
-                selectedDiceIdx = state.selectedDiceIdx;
-                currentGameSessionId = state.currentGameSessionId || 1;
+                currentTurnIdx = 0; // 讀檔回歸當輪第一個行動者
+                rolledDicePool = [];
+                selectedDiceIdx = null;
+                isExecutingAction = false;
+                currentGameSessionId = (state.currentGameSessionId || 0) + 1;
                 gameActive = true;
 
+                // 隱藏對話框
                 document.getElementById('class-select-modal').classList.add('hidden');
                 document.getElementById('game-over-modal').classList.add('opacity-0', 'pointer-events-none');
-                
-                renderSudokuBoard();
-                logCombat("🔄 已成功回復上一局對局進度！");
+                closeResetConfirm();
 
-                const activePlayer = players[turnOrder[currentTurnIdx]];
-                if (activePlayer) {
-                    document.getElementById('game-phase-text').innerText = `${activePlayer.name} 回合`;
-                    if (activePlayer.isHuman) {
-                        document.getElementById('btn-end-turn').disabled = false;
-                        renderDicePoolUI();
-                    } else {
-                        document.getElementById('btn-end-turn').disabled = true;
-                        runAITurn(activePlayer);
-                    }
-                }
+                // 同步 UI 輪數標籤
+                const roundNumEl = document.getElementById('round-number');
+                if (roundNumEl) roundNumEl.innerText = roundNumber;
+
+                renderSudokuBoard();
+                logCombat(`🔄 已恢復存檔，回到第 ${roundNumber} 輪開始處！`);
+
+                processNextTurn();
                 return true;
             } catch (e) {
                 console.error('Failed to restore game state:', e);
@@ -895,7 +889,6 @@
             logCombat(`玩家選擇職業【${CLASSES[selectedClassKey].name}】！`);
             logCombat(`地圖生成了數獨 [${obstacleNumbers.join(', ')}] 的障礙物！`);
             updateBoardElements();
-            saveGameState();
             startNewRound();
         }
 
@@ -970,7 +963,7 @@
             logCombat(`--- 第 ${roundNumber} 輪！順序: [ ${orderNames} ] ---`);
 
             renderTurnOrderUI();
-            saveGameState();
+            saveGameState(); // 固定的存檔點：每輪開局時存檔
             processNextTurn();
         }
 
@@ -1016,7 +1009,6 @@
             logCombat(`>>> 輪到 ${activePlayer.name} (HP: ${formatHp(activePlayer.hp)})`);
 
             updateBoardElements();
-            saveGameState();
 
             await phase1RollDice(activePlayer);
         }
@@ -1067,7 +1059,6 @@
 
             if (currentGameSessionId !== sessionAtStart) return;
             renderDicePoolUI();
-            saveGameState();
 
             if (player.isHuman) {
                 document.getElementById('btn-end-turn').disabled = false;
@@ -1505,7 +1496,6 @@
                 logCombat(`👟 ${player.name} 移動至 (${targetR + 1}, ${targetC + 1})`);
                 consumeSelectedDice();
                 clearBoardHighlights();
-                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1527,7 +1517,6 @@
                 updateBoardElements();
                 consumeSelectedDice();
                 clearBoardHighlights();
-                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1544,7 +1533,6 @@
                 if (!isValid) {
                     logCombat(`⚠️ ${attacker.name} 目標不在有效射程內，行動取消`);
                     consumeSelectedDice();
-                    saveGameState();
                     return;
                 }
 
@@ -1584,7 +1572,6 @@
 
                 consumeSelectedDice();
                 updateBoardElements();
-                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1711,7 +1698,6 @@
 
                 consumeSelectedDice();
                 updateBoardElements();
-                saveGameState();
             } finally {
                 isExecutingAction = false;
                 renderDicePoolUI();
@@ -1854,7 +1840,6 @@
                 selectedDiceIdx = null;
             }
             renderDicePoolUI();
-            saveGameState();
         }
 
         function manualEndTurn() {
@@ -1870,7 +1855,6 @@
             selectedDiceIdx = null;
             logCombat(`⏭️ 手動結束回合`);
             currentTurnIdx++;
-            saveGameState();
             processNextTurn();
         }
 
@@ -2270,7 +2254,6 @@
             await new Promise(r => setTimeout(r, 300));
             if (currentGameSessionId !== sessionAtStart) return;
             currentTurnIdx++;
-            saveGameState();
             processNextTurn();
         }
 
